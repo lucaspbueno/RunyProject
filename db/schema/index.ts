@@ -1,3 +1,3 @@
-export * from "./base";
-export * from "./athlete";
-export * from "./training";
+export * from "./tables";
+export * from "./relations";
+export * from "./enums";

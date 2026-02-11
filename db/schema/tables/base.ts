@@ -19,4 +19,3 @@ export function withBaseColumns<TColumns extends Record<string, any>>(
     deletedAt: timestamp("deleted_at", { withTimezone: true }).nullable(),
   });
 }
-
