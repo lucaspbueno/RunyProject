@@ -1,23 +1,12 @@
-import {
-  type InferInsertModel,
-  type InferSelectModel,
-  relations,
-} from "drizzle-orm";
-import {
-  date,
-  integer,
-  pgTable,
-  timestamp,
-  varchar,
-} from "drizzle-orm/pg-core";
+import { type InferInsertModel, type InferSelectModel, relations } from "drizzle-orm";
+import { date, varchar } from "drizzle-orm/pg-core";
 import { trainings } from "./training";
+import { withBaseColumns } from "./base";
 
-export const athletes = pgTable("athletes", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+export const athletes = withBaseColumns("athletes", {
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   dateOfBirth: date("date_of_birth", { mode: "date" }).notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const athletesRelations = relations(athletes, ({ many }) => ({

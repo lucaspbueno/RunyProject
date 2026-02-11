@@ -1,17 +1,7 @@
-import {
-  type InferInsertModel,
-  type InferSelectModel,
-  relations
-} from "drizzle-orm";
-import {
-  integer,
-  pgEnum,
-  pgTable,
-  text,
-  timestamp,
-  varchar
-} from "drizzle-orm/pg-core";
+import { type InferInsertModel, type InferSelectModel, relations } from "drizzle-orm";
+import { integer, pgEnum, text, varchar } from "drizzle-orm/pg-core";
 import { athletes } from "./athlete";
+import { withBaseColumns } from "./base";
 
 export const trainingIntensity = pgEnum("training_intensity", [
   "low",
@@ -19,8 +9,7 @@ export const trainingIntensity = pgEnum("training_intensity", [
   "high",
 ]);
 
-export const trainings = pgTable("trainings", {
-  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+export const trainings = withBaseColumns("trainings", {
   athleteId: integer("athlete_id")
     .notNull()
     .references(() => athletes.id, { onDelete: "cascade" }),
@@ -28,7 +17,6 @@ export const trainings = pgTable("trainings", {
   durationMinutes: integer("duration_minutes").notNull(),
   intensity: trainingIntensity("intensity").notNull(),
   notes: text("notes"),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const trainingsRelations = relations(trainings, ({ one }) => ({
