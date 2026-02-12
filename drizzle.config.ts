@@ -1,7 +1,7 @@
 import { defineConfig } from "drizzle-kit";
 
 if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL não definida");
+  throw new Error("ERROR: Variable DATABASE_URL not defined in .env file");
 }
 
 export default defineConfig({
