@@ -16,6 +16,6 @@ export function withBaseColumns<TColumns extends Record<string, any>>(
     ...columns,
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-    deletedAt: timestamp("deleted_at", { withTimezone: true }).nullable(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true, mode: 'date' }),
   });
 }
