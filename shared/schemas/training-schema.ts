@@ -18,6 +18,7 @@ export const createTrainingSchema = z.object({
     .positive("Duração deve ser um número positivo")
     .max(480, "Duração máxima é de 8 horas (480 minutos)"),
   intensity: z.enum(TRAINING_INTENSITY_VALUES),
+  notes: z.string().max(1000, "Observações devem ter no máximo 1000 caracteres").optional(),
 });
 
 export const updateTrainingSchema = createTrainingSchema.partial();
@@ -26,9 +27,18 @@ export const listTrainingsByAthleteSchema = z.object({
   athleteId: z.coerce.number().int().positive("ID do atleta deve ser um número positivo"),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(50).default(10),
+  includeDeleted: z.boolean().default(false),
 });
 
 export const deleteTrainingSchema = z.object({
+  id: z.coerce.number().int().positive("ID deve ser um número positivo"),
+});
+
+export const getTrainingSchema = z.object({
+  id: z.coerce.number().int().positive("ID deve ser um número positivo"),
+});
+
+export const reactivateTrainingSchema = z.object({
   id: z.coerce.number().int().positive("ID deve ser um número positivo"),
 });
 
@@ -37,3 +47,5 @@ export type CreateTrainingInput = z.infer<typeof createTrainingSchema>;
 export type UpdateTrainingInput = z.infer<typeof updateTrainingSchema>;
 export type ListTrainingsByAthleteInput = z.infer<typeof listTrainingsByAthleteSchema>;
 export type DeleteTrainingInput = z.infer<typeof deleteTrainingSchema>;
+export type GetTrainingInput = z.infer<typeof getTrainingSchema>;
+export type ReactivateTrainingInput = z.infer<typeof reactivateTrainingSchema>;
