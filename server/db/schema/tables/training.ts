@@ -1,7 +1,8 @@
+import { athletes } from "./athlete";
+import { withBaseColumns } from "./base";
 import { type InferInsertModel, type InferSelectModel } from "drizzle-orm";
 import { integer, text, varchar } from "drizzle-orm/pg-core";
-import { trainingIntensity } from "../enums/training";
-import { athletes, withBaseColumns } from "./index";
+import { trainingIntensity } from "../enums";
 
 export const trainings = withBaseColumns("trainings", {
   athleteId: integer("athlete_id")
