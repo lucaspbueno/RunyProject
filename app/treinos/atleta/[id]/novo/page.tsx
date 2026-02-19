@@ -10,8 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpcClient } from "@/lib/trpc-client";
 import { useToast } from "@/hooks/use-toast";
-import { TRAINING_INTENSITY_VALUES } from "@/shared/constants/training-intensity";
-import { ArrowLeft, Save, Clock, Zap } from "lucide-react";
+import { ArrowLeft, Save, Zap } from "lucide-react";
 import Link from "next/link";
 
 interface Athlete {
@@ -28,17 +27,6 @@ interface CreateTrainingForm {
   durationMinutes: string;
   intensity: "low" | "moderate" | "high";
   notes?: string;
-}
-
-interface Training {
-  id: number;
-  athleteId: number;
-  type: string;
-  durationMinutes: number;
-  intensity: "low" | "moderate" | "high";
-  notes?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 const intensityOptions = [

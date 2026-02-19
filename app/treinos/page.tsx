@@ -22,11 +22,6 @@ interface Athlete {
   updatedAt: Date;
 }
 
-interface TrainingStats {
-  totalTrainings: number;
-  lastTraining?: Date;
-}
-
 export default function TreinosPage() {
   const [athletes, setAthletes] = useState<Athlete[]>([]);
   const [loading, setLoading] = useState(true);

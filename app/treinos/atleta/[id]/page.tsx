@@ -16,7 +16,6 @@ import { trpcClient } from "@/lib/trpc-client";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { TRAINING_INTENSITY_VALUES } from "@/shared/constants/training-intensity";
 import Link from "next/link";
 import { ArrowLeft, Plus, Edit, Trash2, Clock, Zap, User, RotateCcw } from "lucide-react";
 
@@ -374,7 +373,7 @@ export default function TreinosAtletaPage() {
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Confirmar desativação</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Tem certeza que deseja desativar o treino "{training.type}"? 
+                                        Tem certeza que deseja desativar o treino `{training.type}`? 
                                         O treino será desativado mas seus dados serão preservados.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
