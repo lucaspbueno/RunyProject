@@ -139,7 +139,7 @@ export function AthletesTable({
                         <AlertDialogHeader>
                           <AlertDialogTitle>Confirmar desativação</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Tem certeza que deseja desativar o atleta `{athlete.name}`? 
+                            Tem certeza que deseja desativar o atleta {athlete.name}? 
                             O atleta será desativado mas seus dados serão preservados.
                           </AlertDialogDescription>
                         </AlertDialogHeader>

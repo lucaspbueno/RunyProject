@@ -373,7 +373,7 @@ export default function TreinosAtletaPage() {
                                     <AlertDialogHeader>
                                       <AlertDialogTitle>Confirmar desativação</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Tem certeza que deseja desativar o treino `{training.type}`? 
+                                        Tem certeza que deseja desativar o treino {training.type}? 
                                         O treino será desativado mas seus dados serão preservados.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
