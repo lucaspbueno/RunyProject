@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { trainingIntensity } from "@/server/db/schema/enums";
+import { TRAINING_INTENSITY_VALUES } from "@/shared/constants/training-intensity";
 
 /**
  * Schema Zod para validação de dados de treino
@@ -17,7 +17,7 @@ export const createTrainingSchema = z.object({
     .int()
     .positive("Duração deve ser um número positivo")
     .max(480, "Duração máxima é de 8 horas (480 minutos)"),
-  intensity: z.enum(trainingIntensity.enumValues),
+  intensity: z.enum(TRAINING_INTENSITY_VALUES),
 });
 
 export const updateTrainingSchema = createTrainingSchema.partial();
