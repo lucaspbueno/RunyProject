@@ -1,7 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
-import { eq, desc, count, ilike } from "drizzle-orm";
+import { eq, desc, count, isNull } from "drizzle-orm";
 import { publicProcedure, t } from "../trpc";
 import { athletes } from "@/server/db/schema";
 import {
@@ -9,10 +9,7 @@ import {
   updateAthleteSchema,
   listAthletesSchema,
   deleteAthleteSchema,
-  type CreateAthleteInput,
-  type UpdateAthleteInput,
-  type ListAthletesInput,
-  type DeleteAthleteInput,
+  reactivateAthleteSchema,
 } from "../../../shared/schemas/athlete-schema";
 import type { PaginatedResponse } from "../../../shared/types";
 
@@ -43,6 +40,12 @@ export const athleteRouter = t.router({
         };
       } catch (error) {
         console.error("Erro ao criar atleta:", error);
+        
+        // Verificar se é erro de conexão
+        if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
+          throw new Error("Não foi possível conectar ao banco de dados. Verifique se o serviço está disponível.");
+        }
+        
         throw new Error("Falha ao criar atleta");
       }
     }),
@@ -53,22 +56,30 @@ export const athleteRouter = t.router({
   list: publicProcedure
     .input(listAthletesSchema)
     .query(async ({ input, ctx }) => {
-      const { page = 1, limit = 10 } = input;
+      const { page = 1, limit = 10, includeDeleted = false } = input;
       const offset = (page - 1) * limit;
 
       try {
-        // Buscar total de registros
-        const [{ count: totalCount }] = await ctx.db
+        // Buscar total de registros (apenas não excluídos)
+        const totalCountQuery = ctx.db
           .select({ count: count() })
           .from(athletes);
 
-        // Buscar registros paginados
-        const items = await ctx.db
+        const [{ count: totalCount }] = includeDeleted
+          ? await totalCountQuery
+          : await totalCountQuery.where(isNull(athletes.deletedAt));
+
+        // Buscar registros paginados (apenas não excluídos)
+        const itemsQuery = ctx.db
           .select()
           .from(athletes)
           .orderBy(desc(athletes.createdAt))
           .limit(limit)
           .offset(offset);
+
+        const items = includeDeleted
+          ? await itemsQuery
+          : await itemsQuery.where(isNull(athletes.deletedAt));
 
         const totalPages = Math.ceil(totalCount / limit);
 
@@ -84,6 +95,12 @@ export const athleteRouter = t.router({
         return response;
       } catch (error) {
         console.error("Erro ao listar atletas:", error);
+        
+        // Verificar se é erro de conexão
+        if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
+          throw new Error("Não foi possível conectar ao banco de dados. Verifique se o serviço está disponível.");
+        }
+        
         throw new Error("Falha ao listar atletas");
       }
     }),
@@ -130,14 +147,18 @@ export const athleteRouter = t.router({
     }),
 
   /**
-   * Excluir atleta
+   * Desativar atleta (soft delete)
    */
   delete: publicProcedure
     .input(deleteAthleteSchema)
     .mutation(async ({ input, ctx }) => {
       try {
         const [athlete] = await ctx.db
-          .delete(athletes)
+          .update(athletes)
+          .set({ 
+            deletedAt: new Date(),
+            updatedAt: new Date()
+          })
           .where(eq(athletes.id, input.id))
           .returning();
 
@@ -150,8 +171,47 @@ export const athleteRouter = t.router({
           data: athlete,
         };
       } catch (error) {
-        console.error("Erro ao excluir atleta:", error);
-        throw new Error("Falha ao excluir atleta");
+        console.error("Erro ao desativar atleta:", error);
+        throw new Error("Falha ao desativar atleta");
+      }
+    }),
+
+  /**
+   * Reativar atleta (remove soft delete)
+   */
+  reactivate: publicProcedure
+    .input(reactivateAthleteSchema)
+    .mutation(async ({ input, ctx }) => {
+      try {
+        const [existingAthlete] = await ctx.db
+          .select()
+          .from(athletes)
+          .where(eq(athletes.id, input.id));
+
+        if (!existingAthlete) {
+          throw new Error("Atleta não encontrado");
+        }
+
+        if (!existingAthlete.deletedAt) {
+          throw new Error("Atleta já está ativo");
+        }
+
+        const [athlete] = await ctx.db
+          .update(athletes)
+          .set({
+            deletedAt: null,
+            updatedAt: new Date(),
+          })
+          .where(eq(athletes.id, input.id))
+          .returning();
+
+        return {
+          success: true,
+          data: athlete,
+        };
+      } catch (error) {
+        console.error("Erro ao reativar atleta:", error);
+        throw new Error("Falha ao reativar atleta");
       }
     }),
 });
