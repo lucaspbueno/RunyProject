@@ -1,5 +1,3 @@
-import "server-only";
-
 import { athletes } from "./athlete";
 import { withBaseColumns } from "./base";
 import { type InferInsertModel, type InferSelectModel } from "drizzle-orm";

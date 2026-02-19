@@ -1,5 +1,3 @@
-import "server-only";
-
 import { pgEnum } from "drizzle-orm/pg-core";
 import { TRAINING_INTENSITY_VALUES } from "@/shared/constants/training-intensity";
 

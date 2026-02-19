@@ -1,5 +1,3 @@
-import "server-only";
-
 import { withBaseColumns } from "./base";
 import { type InferInsertModel, type InferSelectModel } from "drizzle-orm";
 import { date, varchar } from "drizzle-orm/pg-core";
