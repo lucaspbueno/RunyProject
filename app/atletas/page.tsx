@@ -232,7 +232,7 @@ export default function AtletasPage() {
                         <TableCell className={`font-medium ${athlete.deletedAt ? "opacity-40" : ""}`}>
                           {athlete.name}
                           {athlete.deletedAt && (
-                            <Badge variant="secondary" className="ml-2 text-xs">
+                            <Badge variant="warning" className="ml-2 text-xs">
                               Desativado
                             </Badge>
                           )}
@@ -448,9 +448,9 @@ export default function AtletasPage() {
                   <label className="text-sm font-medium text-muted-foreground">Status</label>
                   <div className="mt-1">
                     {atleta_selecionado.deletedAt ? (
-                      <Badge variant="secondary">Desativado</Badge>
+                      <Badge variant="warning">Desativado</Badge>
                     ) : (
-                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Ativo</Badge>
+                      <Badge variant="success">Ativo</Badge>
                     )}
                   </div>
                 </div>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const navigation = [
   { name: "Atletas", href: "/atletas" },
@@ -20,7 +21,7 @@ export function Navigation() {
           Runy
         </Link>
 
-        <div className="flex space-x-4">
+        <div className="flex items-center space-x-4">
           {navigation.map((item) => (
             <Button
               key={item.href}
@@ -30,6 +31,7 @@ export function Navigation() {
               <Link href={item.href}>{item.name}</Link>
             </Button>
           ))}
+          <ThemeToggle />
         </div>
       </nav>
     </Card>

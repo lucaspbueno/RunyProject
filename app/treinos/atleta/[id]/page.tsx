@@ -57,9 +57,9 @@ const intensityLabels = {
 };
 
 const intensityColors = {
-  low: "bg-green-100 text-green-800 hover:bg-green-100",
-  moderate: "bg-yellow-100 text-yellow-800 hover:bg-yellow-100",
-  high: "bg-red-100 text-red-800 hover:bg-red-100"
+  low: "bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-600 dark:text-white dark:hover:bg-green-700",
+  moderate: "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-600 dark:text-white dark:hover:bg-yellow-700",
+  high: "bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-600 dark:text-white dark:hover:bg-red-700"
 };
 
 export default function TreinosAtletaPage() {
@@ -314,7 +314,7 @@ export default function TreinosAtletaPage() {
                           <TableCell className={`font-medium ${training.deletedAt ? "opacity-40" : ""}`}>
                             {training.type}
                             {training.deletedAt && (
-                              <Badge variant="secondary" className="ml-2 text-xs">
+                              <Badge variant="warning" className="ml-2 text-xs">
                                 Desativado
                               </Badge>
                             )}
@@ -512,11 +512,11 @@ export default function TreinosAtletaPage() {
                   <label className="text-sm font-medium text-muted-foreground">Status</label>
                   <div className="mt-1">
                     {selectedTraining.deletedAt ? (
-                      <Badge variant="secondary">
+                      <Badge variant="warning">
                         Desativado
                       </Badge>
                     ) : (
-                      <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                      <Badge variant="success">
                         Ativo
                       </Badge>
                     )}
