@@ -8,6 +8,13 @@ import {
   calculateIntensityDistribution,
   calculateTypeDistribution,
   getTopTrainingsByLoad,
+  groupTrainingsByISOWeek,
+  computeMonotonyIndex,
+  detectSpike,
+  computeConsistency,
+  computeTrend,
+  type WeeklyAggregate,
+  type TrainingDTO,
 } from "./athlete-insights.calc";
 
 /**
@@ -24,19 +31,26 @@ export function buildAthleteInsights(params: {
 }): AthleteInsightsResponse {
   const { trainingsCurrent, trainingsCompare, period, comparePeriod, intensityFilter, trainingTypeFilter } = params;
 
+  // Converter para DTO para desacoplar do Drizzle
+  const currentDTO = trainingsToDTO(trainingsCurrent);
+  const compareDTO = trainingsCompare ? trainingsToDTO(trainingsCompare) : [];
+
   // Aplicar filtros nos treinos atuais
-  const filteredCurrent = trainingsCurrent.filter(training => {
+  const filteredCurrent = currentDTO.filter(training => {
     const matchesIntensity = intensityFilter === "ALL" || training.intensity === intensityFilter;
     const matchesType = trainingTypeFilter === "ALL" || training.type === trainingTypeFilter;
     return matchesIntensity && matchesType;
   });
 
   // Aplicar filtros nos treinos de comparação (se existirem)
-  const filteredCompare = trainingsCompare ? trainingsCompare.filter(training => {
+  const filteredCompare = compareDTO.filter(training => {
     const matchesIntensity = intensityFilter === "ALL" || training.intensity === intensityFilter;
     const matchesType = trainingTypeFilter === "ALL" || training.type === trainingTypeFilter;
     return matchesIntensity && matchesType;
-  }) : [];
+  });
+
+  // Gerar agregados semanais para cálculos inteligentes
+  const weeklyAggregates = groupTrainingsByISOWeek(filteredCurrent);
 
   // Calcular KPIs básicos
   const kpis = buildKPIs(filteredCurrent, filteredCompare);
@@ -47,14 +61,8 @@ export function buildAthleteInsights(params: {
     byIntensity: calculateIntensityDistribution(filteredCurrent),
   };
 
-  // Calcular séries temporais semanais
-  const timeSeries = calculateWeeklyTimeSeries(filteredCurrent);
-
-  // Gerar insights simples V1
-  const insights = buildSimpleInsights(filteredCurrent);
-
-  // Gerar highlights (top treinos por carga)
-  const highlights = buildHighlights(filteredCurrent);
+  // Gerar insights inteligentes
+  const insights = buildIntelligentInsights(filteredCurrent, weeklyAggregates);
 
   return {
     period: {
@@ -67,16 +75,128 @@ export function buildAthleteInsights(params: {
     },
     kpis,
     distribution,
-    timeSeries,
+    timeSeries: calculateWeeklyTimeSeries(filteredCurrent),
     insights,
-    highlights,
+    highlights: buildHighlights(filteredCurrent),
   };
+}
+
+/**
+ * Gera insights inteligentes
+ */
+function buildIntelligentInsights(trainings: TrainingDTO[], weeklyAggregates: WeeklyAggregate[]): AthleteInsight[] {
+  const insights: AthleteInsight[] = [];
+
+  // Insights V1 existentes
+  if (trainings.length === 0) {
+    insights.push({
+      id: "no-data",
+      severity: "info",
+      title: "Sem dados no período",
+      description: "Não há treinos registrados para o período selecionado.",
+      type: "trend",
+    });
+    return insights;
+  }
+
+  const intensityDist = calculateIntensityDistribution(trainings);
+  const typeDist = calculateTypeDistribution(trainings);
+  const weeklyLoads = weeklyAggregates.map(w => w.totalLoad);
+
+  // 1. Monotonia Alta (warning)
+  const monotonyIndex = computeMonotonyIndex(weeklyLoads);
+  if (monotonyIndex !== null && monotonyIndex >= 2.0) {
+    insights.push({
+      id: "high-monotony",
+      severity: "warning",
+      title: "Alta Monotonia",
+      description: "Baixa variação de carga semanal pode indicar treino repetitivo e risco de sobrecarga.",
+      evidence: `Índice de monotonia: ${monotonyIndex.toFixed(2)}`,
+      type: "monotony",
+    });
+  }
+
+  // 2. Spike de Carga (warning)
+  const spikeResult = detectSpike(weeklyLoads);
+  if (spikeResult.isSpike) {
+    const spikeWeek = weeklyAggregates[spikeResult.spikeWeekIndex!];
+    insights.push({
+      id: "load-spike",
+      severity: "warning",
+      title: "Spike de Carga",
+      description: "Aumento significativo de carga na última semana em relação à média anterior.",
+      evidence: `Semana ${spikeWeek.weekStart}: ${spikeResult.ratio?.toFixed(1)}x a média anterior`,
+      type: "spike",
+    });
+  }
+
+  // 3. Consistência (success/info)
+  const consistency = computeConsistency(weeklyAggregates);
+  if (consistency.activeWeeks >= 3) {
+    insights.push({
+      id: "good-consistency",
+      severity: "info",
+      title: "Boa Consistência",
+      description: `Treinos consistentes nas últimas ${consistency.activeWeeks} semanas com streak de ${consistency.streak}.`,
+      evidence: `${consistency.activeWeeks} semanas ativas (${(consistency.consistencyRate).toFixed(0)}%)`,
+      type: "consistency",
+    });
+  } else if (consistency.activeWeeks === 0) {
+    insights.push({
+      id: "no-consistency",
+      severity: "info",
+      title: "Sem Consistência",
+      description: "Nenhuma semana com frequência mínima de treinos registrada.",
+      evidence: "Considere aumentar a frequência para melhores resultados.",
+      type: "consistency",
+    });
+  }
+
+  // 4. Tendência (info)
+  const trend = computeTrend(weeklyLoads);
+  if (trend !== "UNKNOWN") {
+    const trendText = trend === "UP" ? "crescente" : trend === "DOWN" ? "decrescente" : "estável";
+    insights.push({
+      id: "load-trend",
+      severity: "info",
+      title: "Tendência de Carga",
+      description: `Tendência ${trendText} da carga de treino nas últimas semanas.`,
+      evidence: `Baseado na comparação das médias semanais`,
+      type: "trend",
+    });
+  }
+
+  // Insight V1: Maior concentração de intensidade
+  const highestIntensity = intensityDist.reduce((max, curr) => curr.count > max.count ? curr : max);
+  if (highestIntensity.intensity !== "low") {
+    insights.push({
+      id: "high-intensity-focus",
+      severity: highestIntensity.intensity === "high" ? "warning" : "info",
+      title: "Foco em Intensidade",
+      description: `${Math.round(highestIntensity.percentage)}% dos treinos foram com intensidade ${highestIntensity.intensity}.`,
+      evidence: `${highestIntensity.count} de ${trainings.length} treinos`,
+      type: "trend",
+    });
+  }
+
+  // Insight V1: Tipo de treino mais frequente
+  const mostFrequentType = typeDist.reduce((max, curr) => curr.count > max.count ? curr : max);
+  insights.push({
+    id: "frequent-training-type",
+    severity: "info",
+    title: "Tipo Predominante",
+    description: `${mostFrequentType.type} é o tipo mais realizado (${Math.round(mostFrequentType.percentage)}% do total).`,
+    evidence: `${mostFrequentType.count} sessões`,
+    type: "trend",
+  });
+
+  return insights;
 }
 
 /**
  * Constrói os KPIs básicos com deltas quando houver comparação
  */
-function buildKPIs(current: Training[], compare: Training[]): AthleteInsightKpi[] {
+function buildKPIs(current: TrainingDTO[], compare: TrainingDTO[]): AthleteInsightKpi[] {
   const totalTrainings = current.length;
   const totalMinutes = current.reduce((sum, t) => sum + t.durationMinutes, 0);
   const totalLoad = current.reduce((sum, t) => sum + calculateTrainingLoad(t), 0);
@@ -117,70 +237,9 @@ function buildKPIs(current: Training[], compare: Training[]): AthleteInsightKpi[
 }
 
 /**
- * Gera insights simples V1 sem estatística pesada
- */
-function buildSimpleInsights(trainings: Training[]): AthleteInsight[] {
-  if (trainings.length === 0) {
-    return [
-      {
-        id: "no-data",
-        severity: "info",
-        title: "Sem dados no período",
-        description: "Não há treinos registrados para o período selecionado.",
-        type: "trend",
-      },
-    ];
-  }
-
-  const insights: AthleteInsight[] = [];
-
-  // Insight 1: Maior concentração de intensidade
-  const intensityDist = calculateIntensityDistribution(trainings);
-  const highestIntensity = intensityDist.reduce((max, curr) => curr.count > max.count ? curr : max);
-  if (highestIntensity.intensity !== "low") {
-    insights.push({
-      id: "high-intensity-focus",
-      severity: highestIntensity.intensity === "high" ? "warning" : "info",
-      title: "Foco em intensidade",
-      description: `${Math.round(highestIntensity.percentage)}% dos treinos foram com intensidade ${highestIntensity.intensity}.`,
-      evidence: `${highestIntensity.count} de ${trainings.length} treinos`,
-      type: "trend",
-    });
-  }
-
-  // Insight 2: Tipo de treino mais frequente
-  const typeDist = calculateTypeDistribution(trainings);
-  const mostFrequentType = typeDist.reduce((max, curr) => curr.count > max.count ? curr : max);
-  insights.push({
-    id: "frequent-training-type",
-    severity: "info",
-    title: "Tipo de treino predominante",
-    description: `${mostFrequentType.type} é o tipo mais realizado (${Math.round(mostFrequentType.percentage)}% do total).`,
-    evidence: `${mostFrequentType.count} sessões`,
-    type: "trend",
-  });
-
-  // Insight 3: Semana mais ativa
-  const weeklySeries = calculateWeeklyTimeSeries(trainings);
-  if (weeklySeries.length > 1) {
-    const mostActiveWeek = weeklySeries.reduce((max, curr) => curr.minutes > max.minutes ? curr : max);
-    insights.push({
-      id: "most-active-week",
-      severity: "info",
-      title: "Semana mais ativa",
-      description: `Semana de ${mostActiveWeek.weekStart} teve maior volume: ${mostActiveWeek.minutes} minutos.`,
-      evidence: `${mostActiveWeek.trainingsCount} treinos na semana`,
-      type: "trend",
-    });
-  }
-
-  return insights;
-}
-
-/**
  * Gera highlights com os top treinos por carga
  */
-function buildHighlights(trainings: Training[]) {
+function buildHighlights(trainings: TrainingDTO[]) {
   const topTrainings = getTopTrainingsByLoad(trainings, 5);
 
   return topTrainings.map((training, index) => ({
@@ -195,12 +254,35 @@ function buildHighlights(trainings: Training[]) {
 }
 
 /**
- * Determina a tendência com base nos valores atuais vs anteriores
+ * Determina a tendência com base nos valores atuais vs anteriores (PROTEGIDO contra divisão por zero)
  */
 function getTrend(current: number, previous: number): "up" | "down" | "stable" {
+  // Proteger contra divisão por zero
+  if (previous === 0) {
+    if (current === 0) return "stable";
+    return "up";
+  }
+  
   const threshold = 0.05; // 5% de tolerância
   const change = (current - previous) / previous;
   
   if (Math.abs(change) < threshold) return "stable";
   return change > 0 ? "up" : "down";
+}
+
+/**
+ * Converte Training do Drizzle para TrainingDTO (desacoplamento)
+ */
+function trainingsToDTO(trainings: Training[]): TrainingDTO[] {
+  return trainings.map(training => ({
+    id: training.id,
+    athleteId: training.athleteId,
+    type: training.type,
+    durationMinutes: training.durationMinutes,
+    intensity: training.intensity,
+    notes: training.notes,
+    createdAt: training.createdAt,
+    updatedAt: training.updatedAt,
+    deletedAt: training.deletedAt,
+  }));
 }
