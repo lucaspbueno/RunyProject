@@ -14,7 +14,7 @@ export function LoadingState({ message = "Carregando...", size = "md" }: Loading
 
   return (
     <div className="text-center py-8">
-      <Loader2 className={`animate-spin ${sizeClasses[size]} border-b-2 border-primary mx-auto`} />
+      <Loader2 className={`animate-spin ${sizeClasses[size]} mx-auto`} />
       <p className="mt-2 text-muted-foreground">{message}</p>
     </div>
   );
