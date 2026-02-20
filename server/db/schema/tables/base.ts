@@ -1,4 +1,4 @@
-import { pgTable, timestamp, integer } from "drizzle-orm/pg-core";
+import { integer, pgTable, timestamp } from "drizzle-orm/pg-core";
 import type { PgColumnBuilderBase } from "drizzle-orm/pg-core";
 
 /**
@@ -14,12 +14,15 @@ export function withBaseColumns<
   return pgTable(tableName, {
     id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
     ...columns,
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
+
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
+
     deletedAt: timestamp("deleted_at", { withTimezone: true, mode: "date" }),
   });
 }
