@@ -1,6 +1,7 @@
 import { EditButton } from "@/components/ui/actions/edit-button";
 import { DeleteButton } from "@/components/ui/actions/delete-button";
 import { ReactivateButton } from "@/components/ui/actions/reactivate-button";
+import { InsightsButton } from "@/components/ui/actions/insights-button";
 import { ActionGroup } from "@/components/ui/actions/action-group";
 import type { Athlete } from "@/shared/types";
 
@@ -13,10 +14,11 @@ interface AthleteActionsProps {
   showEdit?: boolean;
   showDelete?: boolean;
   showReactivate?: boolean;
+  showInsights?: boolean;
 }
 
 /**
- * Conjunto de ações para atletas (editar, desativar, reativar)
+ * Conjunto de ações para atletas (editar, insights, desativar, reativar)
  */
 export function AthleteActions({
   athlete,
@@ -26,7 +28,8 @@ export function AthleteActions({
   reactivatingId = null,
   showEdit = true,
   showDelete = true,
-  showReactivate = true
+  showReactivate = true,
+  showInsights = true
 }: AthleteActionsProps) {
   return (
     <ActionGroup>
@@ -43,6 +46,23 @@ export function AthleteActions({
             entity={athlete}
             href="/atletas/:id/editar"
             title="Editar atleta"
+          />
+        )
+      )}
+
+      {showInsights && (
+        athlete.deletedAt ? (
+          <InsightsButton
+            entity={athlete}
+            href="/atletas/:id/insights"
+            disabled={true}
+            title="Não é possível ver insights de atletas desativados"
+          />
+        ) : (
+          <InsightsButton
+            entity={athlete}
+            href="/atletas/:id/insights"
+            title="Ver insights do atleta"
           />
         )
       )}

@@ -48,6 +48,16 @@ export interface ReactivateButtonProps {
   variant?: "default" | "outline" | "ghost";
 }
 
+// Tipos para botão de insights
+export interface InsightsButtonProps {
+  entity: NamedEntity;
+  href: string;
+  disabled?: boolean;
+  title?: string;
+  size?: "sm" | "default" | "lg";
+  variant?: "default" | "outline" | "ghost";
+}
+
 // Tipos para grupo de ações
 export interface ActionGroupProps {
   children: ReactNode;
