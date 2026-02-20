@@ -1,14 +1,6 @@
 import { Button } from "./button";
 import { LucideIcon } from "lucide-react";
-
-interface EmptyStateProps {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-  actionText?: string;
-  actionHref?: string;
-  onAction?: () => void;
-}
+import type { EmptyStateProps } from "@/shared/types/ui/components";
 
 /**
  * Componente reutilizável para estado vazio

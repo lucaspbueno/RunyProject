@@ -1,9 +1,5 @@
 import { Loader2 } from "lucide-react";
-
-interface LoadingStateProps {
-  message?: string;
-  size?: "sm" | "md" | "lg";
-}
+import type { LoadingStateProps } from "@/shared/types/ui/components";
 
 /**
  * Componente reutilizável para estado de carregamento

@@ -1,12 +1,6 @@
 import { Button } from "./button";
 import { AlertTriangle, RotateCcw } from "lucide-react";
-
-interface ErrorStateProps {
-  title?: string;
-  description?: string;
-  onRetry?: () => void;
-  retryText?: string;
-}
+import type { ErrorStateProps } from "@/shared/types/ui/components";
 
 /**
  * Componente reutilizável para estado de erro
