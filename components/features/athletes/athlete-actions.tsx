@@ -2,16 +2,7 @@ import { EditButton } from "@/components/ui/actions/edit-button";
 import { DeleteButton } from "@/components/ui/actions/delete-button";
 import { ReactivateButton } from "@/components/ui/actions/reactivate-button";
 import { ActionGroup } from "@/components/ui/actions/action-group";
-
-interface Athlete {
-  id: number;
-  name: string;
-  email: string;
-  dateOfBirth: Date | string;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  deletedAt?: Date | string | null;
-}
+import type { Athlete } from "@/shared/types";
 
 interface AthleteActionsProps {
   athlete: Athlete;

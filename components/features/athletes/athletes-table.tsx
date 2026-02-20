@@ -8,16 +8,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Calendar, Mail } from "lucide-react";
 import { AthleteActions } from "./athlete-actions";
-
-interface Athlete {
-  id: number;
-  name: string;
-  email: string;
-  dateOfBirth: Date | string;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  deletedAt?: Date | string | null;
-}
+import type { Athlete } from "@/shared/types";
 
 interface AthletesTableProps {
   athletes: Athlete[];

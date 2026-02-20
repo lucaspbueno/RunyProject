@@ -13,16 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-
-interface Athlete {
-  id: number;
-  name: string;
-  email: string;
-  dateOfBirth: Date | string;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  deletedAt?: Date | string | null;
-}
+import type { Athlete } from "@/shared/types";
 
 interface AthleteFormProps {
   athlete?: Athlete | null;

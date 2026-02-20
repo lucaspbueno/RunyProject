@@ -6,16 +6,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import Link from "next/link";
 import { User, Mail, RotateCcw, Loader2 } from "lucide-react";
-
-interface Athlete {
-  id: number;
-  name: string;
-  email: string;
-  dateOfBirth: Date | string;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  deletedAt?: Date | string | null;
-}
+import type { Athlete } from "@/shared/types";
 
 interface AthleteDetailsDialogProps {
   athlete: Athlete | null;
