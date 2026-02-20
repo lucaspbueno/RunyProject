@@ -9,7 +9,10 @@ RUN npm ci
 # Copiar código fonte
 COPY . .
 
+# Tornar o entrypoint executável
+RUN chmod +x scripts/entrypoint.sh
+
 EXPOSE 3000
 
-# Iniciar em modo desenvolvimento
-CMD ["npm", "run", "dev"]
+# Entrypoint: executa migrations, seed e inicia o servidor
+CMD ["sh", "scripts/entrypoint.sh"]
