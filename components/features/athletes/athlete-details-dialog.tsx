@@ -5,7 +5,7 @@ import { formatDateBR, calculateAge } from "@/lib/date";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import Link from "next/link";
-import { User, Mail, RotateCcw } from "lucide-react";
+import { User, Mail, RotateCcw, Loader2 } from "lucide-react";
 
 interface Athlete {
   id: number;
@@ -126,8 +126,17 @@ export function AthleteDetailsDialog({
               onClick={() => onReactivate(athlete.id)}
               disabled={reactivatingId === athlete.id}
             >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Reativar
+              {reactivatingId === athlete.id ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Reativando...
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Reativar
+                </>
+              )}
             </Button>
           )}
         </div>
