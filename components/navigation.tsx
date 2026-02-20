@@ -14,6 +14,17 @@ const navigation = [
 export function Navigation() {
   const pathname = usePathname();
 
+  const isActiveRoute = (href: string) => {
+    if (pathname === href) return true;
+    
+    // Considera rotas filhas como ativas
+    if (pathname.startsWith(href) && href !== '/') {
+      return true;
+    }
+    
+    return false;
+  };
+
   return (
     <Card className="mb-6 p-4">
       <nav className="flex items-center justify-between">
@@ -25,7 +36,7 @@ export function Navigation() {
           {navigation.map((item) => (
             <Button
               key={item.href}
-              variant={pathname === item.href ? "default" : "ghost"}
+              variant={isActiveRoute(item.href) ? "default" : "ghost"}
               asChild
             >
               <Link href={item.href}>{item.name}</Link>

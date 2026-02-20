@@ -7,7 +7,7 @@ import { formatDateBR, calculateAge } from "@/lib/date";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import Link from "next/link";
-import { Edit, Trash2, Calendar, Mail } from "lucide-react";
+import { Edit, Trash2, Calendar, Mail, Loader2 } from "lucide-react";
 
 interface Athlete {
   id: number;
@@ -132,7 +132,11 @@ export function AthletesTable({
                             event.stopPropagation();
                           }}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          {deletingId === athlete.id ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
