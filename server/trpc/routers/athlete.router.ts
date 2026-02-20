@@ -1,9 +1,9 @@
 import "server-only";
 
 import { z } from "zod";
-import { count, desc, eq, isNull } from "drizzle-orm";
+import { count, desc, eq, isNull, and, gte, lte } from "drizzle-orm";
 import { publicProcedure, t } from "../trpc";
-import { athletes } from "@/server/db/schema";
+import { athletes, trainings } from "@/server/db/schema";
 import {
   createAthleteSchema,
   deleteAthleteSchema,
@@ -12,6 +12,7 @@ import {
   reactivateAthleteSchema,
   updateAthleteSchema,
 } from "@/shared/schemas/athlete-schema";
+import { athleteInsightsInputSchema } from "@/shared/schemas/athlete-insights-schema";
 import type { PaginatedResponse } from "@/shared/types";
 import {
   athleteNotFound,
@@ -22,6 +23,51 @@ import {
   isTRPCError,
   isUniqueViolation,
 } from "@/server/trpc/errors";
+import { buildAthleteInsights } from "@/server/services/insights/athlete-insights.service";
+
+/**
+ * Normaliza períodos de data para consultas
+ */
+function normalizePeriods(
+  period: string,
+  fromDate?: string,
+  toDate?: string,
+  compare?: boolean
+) {
+  let currentPeriod: { from: Date; to: Date };
+  let comparePeriod: { from: Date; to: Date } | undefined;
+
+  if (period === "custom" && fromDate && toDate) {
+    currentPeriod = {
+      from: new Date(fromDate),
+      to: new Date(toDate),
+    };
+  } else {
+    const days = parseInt(period);
+    const to = new Date();
+    const from = new Date();
+    from.setDate(to.getDate() - days + 1);
+    from.setHours(0, 0, 0, 0);
+    to.setHours(23, 59, 59, 999);
+    
+    currentPeriod = { from, to };
+  }
+
+  if (compare && currentPeriod) {
+    const periodDays = Math.ceil((currentPeriod.to.getTime() - currentPeriod.from.getTime()) / (1000 * 60 * 60 * 24));
+    const compareTo = new Date(currentPeriod.from);
+    compareTo.setDate(compareTo.getDate() - 1);
+    const compareFrom = new Date(compareTo);
+    compareFrom.setDate(compareFrom.getDate() - periodDays + 1);
+    
+    comparePeriod = {
+      from: compareFrom,
+      to: compareTo,
+    };
+  }
+
+  return { currentPeriod, comparePeriod };
+}
 
 /**
  * Router tRPC para operações CRUD de atletas.
@@ -270,6 +316,79 @@ export const athleteRouter = t.router({
         if (isTRPCError(error)) throw error;
 
         throw internalError("reativar atleta", error);
+      }
+    }),
+
+  /**
+   * Buscar insights de um atleta.
+   * Retorna métricas, distribuições, séries temporais e insights inteligentes.
+   */
+  getInsights: publicProcedure
+    .input(athleteInsightsInputSchema)
+    .query(async ({ input, ctx }) => {
+      const { athleteId, period, fromDate, toDate, compare, intensityFilter, trainingTypeFilter } = input;
+
+      try {
+        // 1. Validar que o atleta existe
+        const [athlete] = await ctx.db
+          .select()
+          .from(athletes)
+          .where(eq(athletes.id, athleteId));
+
+        if (!athlete) {
+          throw athleteNotFound();
+        }
+
+        // 2. Normalizar o período
+        const { currentPeriod, comparePeriod } = normalizePeriods(period, fromDate, toDate, compare);
+
+        // 3. Buscar treinos do período atual
+        const trainingsCurrent = await ctx.db
+          .select()
+          .from(trainings)
+          .where(
+            and(
+              eq(trainings.athleteId, athleteId),
+              gte(trainings.createdAt, currentPeriod.from),
+              lte(trainings.createdAt, currentPeriod.to),
+              isNull(trainings.deletedAt)
+            )
+          );
+
+        // 4. Buscar treinos do período de comparação (se aplicável)
+        let trainingsCompare: typeof trainingsCurrent = [];
+        if (compare && comparePeriod) {
+          trainingsCompare = await ctx.db
+            .select()
+            .from(trainings)
+            .where(
+              and(
+                eq(trainings.athleteId, athleteId),
+                gte(trainings.createdAt, comparePeriod.from),
+                lte(trainings.createdAt, comparePeriod.to),
+                isNull(trainings.deletedAt)
+              )
+            );
+        }
+
+        // 5. Montar e retornar insights
+        return buildAthleteInsights({
+          trainingsCurrent,
+          trainingsCompare: compare ? trainingsCompare : undefined,
+          period: currentPeriod,
+          comparePeriod: compare ? comparePeriod : undefined,
+          intensityFilter,
+          trainingTypeFilter,
+        });
+
+      } catch (error) {
+        if (isTRPCError(error)) throw error;
+
+        if (isConnectionError(error)) {
+          throw databaseConnectionError(error);
+        }
+
+        throw internalError("buscar insights do atleta", error);
       }
     }),
 });
