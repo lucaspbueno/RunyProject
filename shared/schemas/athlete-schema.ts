@@ -22,13 +22,14 @@ export const createAthleteSchema = z.object({
         // Aceita tanto formato datetime (ISO) quanto formato de data (YYYY-MM-DD)
         const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
         const datetimeRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/;
-        
+
         if (!dateRegex.test(date) && !datetimeRegex.test(date)) {
           return false;
         }
-        
+
         const birthDate = new Date(date);
         const today = new Date();
+
         return !isNaN(birthDate.getTime()) && birthDate < today;
       },
       "Data de nascimento inválida ou deve estar no passado"
@@ -43,6 +44,10 @@ export const listAthletesSchema = z.object({
   includeDeleted: z.coerce.boolean().default(false),
 });
 
+export const getAthleteSchema = z.object({
+  id: z.coerce.number().int().positive("ID deve ser um número positivo"),
+});
+
 export const deleteAthleteSchema = z.object({
   id: z.coerce.number().int().positive("ID deve ser um número positivo"),
 });
@@ -55,5 +60,6 @@ export const reactivateAthleteSchema = z.object({
 export type CreateAthleteInput = z.infer<typeof createAthleteSchema>;
 export type UpdateAthleteInput = z.infer<typeof updateAthleteSchema>;
 export type ListAthletesInput = z.infer<typeof listAthletesSchema>;
+export type GetAthleteInput = z.infer<typeof getAthleteSchema>;
 export type DeleteAthleteInput = z.infer<typeof deleteAthleteSchema>;
 export type ReactivateAthleteInput = z.infer<typeof reactivateAthleteSchema>;

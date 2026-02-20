@@ -12,12 +12,7 @@ import { trpcClient } from "@/lib/trpc-client";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
-
-interface CreateAthleteForm {
-  name: string;
-  email: string;
-  dateOfBirth: string;
-}
+import type { CreateAthleteForm } from "@/shared/types";
 
 export default function NovoAtletaPage() {
   const router = useRouter();

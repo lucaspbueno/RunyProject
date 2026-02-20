@@ -1,10 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { Wrapper } from "@/components/wrapper";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,21 +18,7 @@ import { trpcClient } from "@/lib/trpc-client";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
-
-interface Athlete {
-  id: number;
-  name: string;
-  email: string;
-  dateOfBirth: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface UpdateAthleteForm {
-  name: string;
-  email: string;
-  dateOfBirth: string;
-}
+import type { Athlete, UpdateAthleteForm } from "@/shared/types";
 
 export default function EditarAtletaPage() {
   const router = useRouter();
@@ -44,41 +36,33 @@ export default function EditarAtletaPage() {
 
   const athleteId = parseInt(params.id as string);
 
-  const loadAthlete = async () => {
+  const loadAthlete = useCallback(async () => {
     try {
       setInitialLoading(true);
-      // Como não temos um endpoint get, vamos buscar da lista
-      const result = await trpcClient.athletes.list.query({ page: 1, limit: 50 });
-      const foundAthlete = result.items.find(a => a.id === athleteId);
-      
-      if (!foundAthlete) {
-        toast({
-          title: "Erro",
-          description: "Atleta não encontrado",
-          variant: "destructive",
-        });
-        router.push("/atletas");
-        return;
-      }
+      const foundAthlete = await trpcClient.athletes.getById.query({
+        id: athleteId,
+      });
 
       setAthlete(foundAthlete);
       setForm({
         name: foundAthlete.name,
         email: foundAthlete.email,
-        dateOfBirth: new Date(foundAthlete.dateOfBirth).toISOString().split('T')[0],
+        dateOfBirth: new Date(foundAthlete.dateOfBirth)
+          .toISOString()
+          .split("T")[0],
       });
     } catch (error) {
       console.error("Erro ao carregar atleta:", error);
       toast({
         title: "Erro",
-        description: "Falha ao carregar os dados do atleta",
+        description: "Atleta não encontrado ou falha ao carregar os dados.",
         variant: "destructive",
       });
       router.push("/atletas");
     } finally {
       setInitialLoading(false);
     }
-  };
+  }, [athleteId, router, toast]);
 
   const validateForm = (): boolean => {
     const newErrors: Partial<UpdateAthleteForm> = {};
@@ -107,7 +91,7 @@ export default function EditarAtletaPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -118,12 +102,12 @@ export default function EditarAtletaPage() {
         id: athleteId,
         data: form,
       });
-      
+
       toast({
         title: "Sucesso",
         description: "Atleta atualizado com sucesso",
       });
-      
+
       router.push("/atletas");
     } catch (error) {
       console.error("Erro ao atualizar atleta:", error);
@@ -138,9 +122,9 @@ export default function EditarAtletaPage() {
   };
 
   const handleInputChange = (field: keyof UpdateAthleteForm, value: string) => {
-    setForm(prev => ({ ...prev, [field]: value }));
+    setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
   };
 
@@ -148,7 +132,7 @@ export default function EditarAtletaPage() {
     if (athleteId) {
       loadAthlete();
     }
-  }, [athleteId]);
+  }, [athleteId, loadAthlete]);
 
   if (initialLoading) {
     return (
@@ -156,7 +140,9 @@ export default function EditarAtletaPage() {
         <Navigation />
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-muted-foreground">Carregando dados do atleta...</p>
+          <p className="mt-2 text-muted-foreground">
+            Carregando dados do atleta...
+          </p>
         </div>
       </Wrapper>
     );
@@ -176,7 +162,7 @@ export default function EditarAtletaPage() {
   return (
     <Wrapper>
       <Navigation />
-      
+
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
           <Button variant="ghost" asChild className="mb-4">
@@ -191,7 +177,8 @@ export default function EditarAtletaPage() {
           <CardHeader>
             <CardTitle>Editar Atleta</CardTitle>
             <CardDescription>
-              Atualize as informações do atleta: {athlete.name}
+              Atualize as informações do atleta:{" "}
+              <span className="font-medium">{athlete.name}</span>
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -234,10 +221,12 @@ export default function EditarAtletaPage() {
                   id="dateOfBirth"
                   type="date"
                   value={form.dateOfBirth}
-                  onChange={(e) => handleInputChange("dateOfBirth", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("dateOfBirth", e.target.value)
+                  }
                   className={errors.dateOfBirth ? "border-red-500" : ""}
                   disabled={loading}
-                  max={new Date().toISOString().split('T')[0]}
+                  max={new Date().toISOString().split("T")[0]}
                 />
                 {errors.dateOfBirth && (
                   <p className="text-sm text-red-500">{errors.dateOfBirth}</p>
@@ -253,10 +242,7 @@ export default function EditarAtletaPage() {
                 >
                   Cancelar
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={loading}
-                >
+                <Button type="submit" disabled={loading}>
                   {loading ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>

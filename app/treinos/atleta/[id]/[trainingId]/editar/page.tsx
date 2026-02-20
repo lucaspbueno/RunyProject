@@ -1,51 +1,42 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { Wrapper } from "@/components/wrapper";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpcClient } from "@/lib/trpc-client";
 import { useToast } from "@/hooks/use-toast";
-import { TRAINING_INTENSITY_VALUES } from "@/shared/constants/training-intensity";
-import { ArrowLeft, Save, Clock, Zap } from "lucide-react";
+import { ArrowLeft, Save, Zap } from "lucide-react";
 import Link from "next/link";
-
-interface Athlete {
-  id: number;
-  name: string;
-  email: string;
-  dateOfBirth: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface Training {
-  id: number;
-  athleteId: number;
-  type: string;
-  durationMinutes: number;
-  intensity: "low" | "moderate" | "high";
-  notes?: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  deletedAt?: Date | null;
-}
-
-interface UpdateTrainingForm {
-  type: string;
-  durationMinutes: string;
-  intensity: "low" | "moderate" | "high";
-  notes?: string;
-}
+import type { Athlete, Training } from "@/shared/types";
+import type { UpdateTrainingForm } from "@/shared/types/forms";
 
 const intensityOptions = [
-  { value: "low", label: "Baixa", description: "Treino leve, aquecimento ou recuperação" },
-  { value: "moderate", label: "Moderada", description: "Treino de intensidade intermediária" },
-  { value: "high", label: "Alta", description: "Treino intenso, de alta performance" },
+  {
+    value: "low",
+    label: "Baixa",
+    description: "Treino leve, aquecimento ou recuperação",
+  },
+  {
+    value: "moderate",
+    label: "Moderada",
+    description: "Treino de intensidade intermediária",
+  },
+  {
+    value: "high",
+    label: "Alta",
+    description: "Treino intenso, de alta performance",
+  },
 ];
 
 export default function EditarTreinoPage() {
@@ -67,68 +58,52 @@ export default function EditarTreinoPage() {
   const athleteId = parseInt(params.id as string);
   const trainingId = parseInt(params.trainingId as string);
 
-  const loadAthlete = async () => {
-    try {
-      const result = await trpcClient.athletes.list.query({ page: 1, limit: 50 });
-      const foundAthlete = result.items.find(a => a.id === athleteId);
-      
-      if (!foundAthlete) {
-        toast({
-          title: "Erro",
-          description: "Atleta não encontrado",
-          variant: "destructive",
-        });
-        router.push("/treinos");
-        return;
-      }
+  const loadAthlete = useCallback(async () => {
+    const foundAthlete = await trpcClient.athletes.getById.query({
+      id: athleteId,
+    });
+    setAthlete(foundAthlete);
+  }, [athleteId]);
 
-      setAthlete(foundAthlete);
-    } catch (error) {
-      console.error("Erro ao carregar atleta:", error);
-      toast({
-        title: "Erro",
-        description: "Falha ao carregar os dados do atleta",
-        variant: "destructive",
-      });
-      router.push("/treinos");
+  const loadTraining = useCallback(async () => {
+    const foundTraining = await trpcClient.trainings.getById.query({
+      id: trainingId,
+    });
+
+    if (foundTraining.athleteId !== athleteId) {
+      throw new Error("Treino não pertence a este atleta.");
     }
-  };
 
-  const loadTraining = async () => {
-    try {
-      const foundTraining = await trpcClient.trainings.getById.query({ 
-        id: trainingId 
-      });
-      
-      // Verificar se o treino pertence ao atleta correto
-      if (foundTraining.athleteId !== athleteId) {
+    setTraining(foundTraining);
+    setForm({
+      type: foundTraining.type,
+      durationMinutes: foundTraining.durationMinutes.toString(),
+      intensity: foundTraining.intensity,
+      notes: foundTraining.notes ?? "",
+    });
+  }, [athleteId, trainingId]);
+
+  useEffect(() => {
+    if (!athleteId || !trainingId) return;
+
+    const loadData = async () => {
+      try {
+        await Promise.all([loadAthlete(), loadTraining()]);
+      } catch (error) {
+        console.error("Erro ao carregar dados:", error);
         toast({
           title: "Erro",
-          description: "Treino não encontrado para este atleta",
+          description: "Dados não encontrados ou falha ao carregar.",
           variant: "destructive",
         });
         router.push(`/treinos/atleta/${athleteId}`);
-        return;
+      } finally {
+        setInitialLoading(false);
       }
+    };
 
-      setTraining(foundTraining);
-      setForm({
-        type: foundTraining.type,
-        durationMinutes: foundTraining.durationMinutes.toString(),
-        intensity: foundTraining.intensity,
-        notes: foundTraining.notes || "",
-      });
-    } catch (error) {
-      console.error("Erro ao carregar treino:", error);
-      toast({
-        title: "Erro",
-        description: "Falha ao carregar os dados do treino",
-        variant: "destructive",
-      });
-      router.push(`/treinos/atleta/${athleteId}`);
-      throw error; // Propagar erro para o useEffect tratar
-    }
-  };
+    loadData();
+  }, [athleteId, trainingId, loadAthlete, loadTraining, router, toast]);
 
   const validateForm = (): boolean => {
     const newErrors: Partial<UpdateTrainingForm> = {};
@@ -149,7 +124,7 @@ export default function EditarTreinoPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -162,15 +137,15 @@ export default function EditarTreinoPage() {
           type: form.type,
           durationMinutes: parseInt(form.durationMinutes),
           intensity: form.intensity,
-          ...(form.notes && { notes: form.notes }),
+          ...(form.notes ? { notes: form.notes } : {}),
         },
       });
-      
+
       toast({
         title: "Sucesso",
         description: "Treino atualizado com sucesso",
       });
-      
+
       router.push(`/treinos/atleta/${athleteId}`);
     } catch (error) {
       console.error("Erro ao atualizar treino:", error);
@@ -184,33 +159,15 @@ export default function EditarTreinoPage() {
     }
   };
 
-  const handleInputChange = (field: keyof UpdateTrainingForm, value: string) => {
-    setForm(prev => ({ ...prev, [field]: value }));
+  const handleInputChange = (
+    field: keyof UpdateTrainingForm,
+    value: string,
+  ) => {
+    setForm((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: undefined }));
+      setErrors((prev) => ({ ...prev, [field]: undefined }));
     }
   };
-
-  useEffect(() => {
-    if (athleteId && trainingId) {
-      const loadData = async () => {
-        try {
-          // Carregar ambos em paralelo
-          await Promise.all([
-            loadAthlete(),
-            loadTraining()
-          ]);
-        } catch (error) {
-          console.error("Erro ao carregar dados:", error);
-        } finally {
-          // Garantir que initialLoading seja sempre desativado
-          setInitialLoading(false);
-        }
-      };
-
-      loadData();
-    }
-  }, [athleteId, trainingId]);
 
   if (initialLoading) {
     return (
@@ -218,7 +175,9 @@ export default function EditarTreinoPage() {
         <Navigation />
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="mt-2 text-muted-foreground">Carregando dados do treino...</p>
+          <p className="mt-2 text-muted-foreground">
+            Carregando dados do treino...
+          </p>
         </div>
       </Wrapper>
     );
@@ -238,7 +197,7 @@ export default function EditarTreinoPage() {
   return (
     <Wrapper>
       <Navigation />
-      
+
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
           <Button variant="ghost" asChild className="mb-4">
@@ -253,7 +212,8 @@ export default function EditarTreinoPage() {
           <CardHeader>
             <CardTitle>Editar Treino</CardTitle>
             <CardDescription>
-              Atualize as informações do treino para: <span className="font-medium">{athlete.name}</span>
+              Atualize as informações do treino para:{" "}
+              <span className="font-medium">{athlete.name}</span>
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -280,7 +240,9 @@ export default function EditarTreinoPage() {
                   id="durationMinutes"
                   type="number"
                   value={form.durationMinutes}
-                  onChange={(e) => handleInputChange("durationMinutes", e.target.value)}
+                  onChange={(e) =>
+                    handleInputChange("durationMinutes", e.target.value)
+                  }
                   placeholder="60"
                   min="1"
                   max="480"
@@ -288,7 +250,9 @@ export default function EditarTreinoPage() {
                   disabled={loading}
                 />
                 {errors.durationMinutes && (
-                  <p className="text-sm text-red-500">{errors.durationMinutes}</p>
+                  <p className="text-sm text-red-500">
+                    {errors.durationMinutes}
+                  </p>
                 )}
               </div>
 
@@ -296,19 +260,30 @@ export default function EditarTreinoPage() {
                 <Label>Intensidade *</Label>
                 <div className="space-y-3">
                   {intensityOptions.map((option) => (
-                    <div key={option.value} className="flex items-start space-x-3">
+                    <div
+                      key={option.value}
+                      className="flex items-start space-x-3"
+                    >
                       <input
                         type="radio"
                         id={option.value}
                         name="intensity"
                         value={option.value}
                         checked={form.intensity === option.value}
-                        onChange={(e) => handleInputChange("intensity", e.target.value as "low" | "moderate" | "high")}
+                        onChange={(e) =>
+                          handleInputChange(
+                            "intensity",
+                            e.target.value as "low" | "moderate" | "high",
+                          )
+                        }
                         disabled={loading}
                         className="mt-1"
                       />
                       <div className="flex-1">
-                        <Label htmlFor={option.value} className="font-medium cursor-pointer">
+                        <Label
+                          htmlFor={option.value}
+                          className="font-medium cursor-pointer"
+                        >
                           <Zap className="inline mr-2 h-4 w-4" />
                           {option.label}
                         </Label>
@@ -343,10 +318,7 @@ export default function EditarTreinoPage() {
                 >
                   Cancelar
                 </Button>
-                <Button
-                  type="submit"
-                  disabled={loading}
-                >
+                <Button type="submit" disabled={loading}>
                   {loading ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>

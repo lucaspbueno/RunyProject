@@ -1,65 +1,104 @@
 import "server-only";
 
 import { z } from "zod";
-import { eq, desc, count, isNull, and } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { publicProcedure, t } from "../trpc";
-import { trainings, athletes } from "@/server/db/schema";
+import { athletes, trainings } from "@/server/db/schema";
 import {
   createTrainingSchema,
-  updateTrainingSchema,
-  listTrainingsByAthleteSchema,
   deleteTrainingSchema,
   getTrainingSchema,
+  listTrainingsByAthleteSchema,
   reactivateTrainingSchema,
-  type CreateTrainingInput,
-  type UpdateTrainingInput,
-  type ListTrainingsByAthleteInput,
-  type DeleteTrainingInput,
-  type GetTrainingInput,
-  type ReactivateTrainingInput,
-} from "../../../shared/schemas/training-schema";
-import type { PaginatedResponse } from "../../../shared/types";
+  updateTrainingSchema,
+} from "@/shared/schemas/training-schema";
+import type { PaginatedResponse } from "@/shared/types";
+import {
+  athleteNotFound,
+  conflictError,
+  internalError,
+  isTRPCError,
+  trainingNotFound,
+} from "@/server/trpc/errors";
 
 /**
- * Router tRPC para operações CRUD de treinos
- * Inclui validação Zod e paginação por atleta
- */
+ * Router tRPC para operações CRUD de treinos.
+ * Todos os erros usam TRPCError com códigos semânticos.
 
+ * Regras de ativo/inativo aplicadas via guards de status-policy.ts:
+ *  - getById       → retorna independente do status (leitura total)
+ *  - create        → ❌ CONFLICT se atleta inativo
+ *  - listByAthlete → leitura histórica permitida para qualquer atleta;
+ *                    treinos inativos visíveis apenas com includeDeleted=true
+ *  - update        → ❌ CONFLICT se treino inativo
+ *                  → ❌ CONFLICT se atleta inativo
+ *  - delete        → ❌ CONFLICT se treino já inativo
+ *  - reactivate    → ❌ CONFLICT se treino já ativo
+ *                  → ❌ CONFLICT se atleta inativo
+ */
 export const trainingRouter = t.router({
   /**
-   * Criar novo treino
+   * Buscar treino por ID.
+   * Retorna o treino independente do status (ativo/inativo) —
+   * necessário para telas de detalhe, auditoria e reativação.
+   */
+  getById: publicProcedure
+    .input(getTrainingSchema)
+    .query(async ({ input, ctx }) => {
+      const [training] = await ctx.db
+        .select()
+        .from(trainings)
+        .where(eq(trainings.id, input.id));
+
+      if (!training) {
+        throw trainingNotFound();
+      }
+
+      return training;
+    }),
+
+  /**
+   * Criar novo treino.
+   * Regra: atleta deve estar ativo.
+   * Treino é sempre criado com deletedAt = null (ativo).
    */
   create: publicProcedure
     .input(createTrainingSchema)
     .mutation(async ({ input, ctx }) => {
+      const [athlete] = await ctx.db
+        .select()
+        .from(athletes)
+        .where(eq(athletes.id, input.athleteId));
+
+      if (!athlete) {
+        throw athleteNotFound();
+      }
+
+      if (athlete.deletedAt) {
+        throw conflictError(
+          "Não é possível realizar esta operação em treinos de um atleta desativado.",
+        );
+      }
+
       try {
-        // Verificar se atleta existe
-        const [athlete] = await ctx.db
-          .select()
-          .from(athletes)
-          .where(eq(athletes.id, input.athleteId));
-
-        if (!athlete) {
-          throw new Error("Atleta não encontrado");
-        }
-
         const [training] = await ctx.db
           .insert(trainings)
           .values(input)
           .returning();
 
-        return {
-          success: true,
-          data: training,
-        };
+        return { success: true, data: training };
       } catch (error) {
-        console.error("Erro ao criar treino:", error);
-        throw new Error("Falha ao criar treino");
+        if (isTRPCError(error)) throw error;
+
+        throw internalError("criar treino", error);
       }
     }),
 
   /**
-   * Listar treinos de um atleta com paginação
+   * Listar treinos de um atleta com paginação.
+   * Leitura histórica: permitida mesmo que o atleta esteja inativo.
+   * Apenas a existência do atleta é verificada (404 se não encontrado).
+   * Treinos inativos são incluídos somente com includeDeleted=true.
    */
   listByAthlete: publicProcedure
     .input(listTrainingsByAthleteSchema)
@@ -67,30 +106,26 @@ export const trainingRouter = t.router({
       const { athleteId, page = 1, limit = 10, includeDeleted = false } = input;
       const offset = (page - 1) * limit;
 
+      const [athlete] = await ctx.db
+        .select()
+        .from(athletes)
+        .where(eq(athletes.id, athleteId));
+
+      if (!athlete) {
+        throw athleteNotFound();
+      }
+
       try {
-        // Verificar se atleta existe
-        const [athlete] = await ctx.db
-          .select()
-          .from(athletes)
-          .where(eq(athletes.id, athleteId));
-
-        if (!athlete) {
-          throw new Error("Atleta não encontrado");
-        }
-
-        // Construir condição where base
         const baseCondition = eq(trainings.athleteId, athleteId);
-        const whereCondition = includeDeleted 
-          ? baseCondition 
+        const whereCondition = includeDeleted
+          ? baseCondition
           : and(baseCondition, isNull(trainings.deletedAt));
 
-        // Buscar total de registros
         const [{ count: totalCount }] = await ctx.db
           .select({ count: count() })
           .from(trainings)
           .where(whereCondition);
 
-        // Buscar registros paginados
         const items = await ctx.db
           .select()
           .from(trainings)
@@ -101,7 +136,7 @@ export const trainingRouter = t.router({
 
         const totalPages = Math.ceil(totalCount / limit);
 
-        const response: PaginatedResponse<typeof items[0]> = {
+        const response: PaginatedResponse<(typeof items)[0]> = {
           items,
           totalCount,
           currentPage: page,
@@ -112,62 +147,56 @@ export const trainingRouter = t.router({
 
         return response;
       } catch (error) {
-        console.error("Erro ao listar treinos:", error);
-        throw new Error("Falha ao listar treinos");
+        if (isTRPCError(error)) throw error;
+
+        throw internalError("listar treinos", error);
       }
     }),
 
   /**
-   * Buscar treino por ID
-   */
-  getById: publicProcedure
-    .input(getTrainingSchema)
-    .query(async ({ input, ctx }) => {
-      const { id } = input;
-
-      try {
-        const [training] = await ctx.db
-          .select()
-          .from(trainings)
-          .where(eq(trainings.id, id));
-
-        if (!training) {
-          throw new Error("Treino não encontrado");
-        }
-
-        return training;
-      } catch (error) {
-        console.error("Erro ao buscar treino:", error);
-        throw new Error("Falha ao buscar treino");
-      }
-    }),
-
-  /**
-   * Atualizar treino existente
+   * Atualizar treino existente.
+   * Regra: treino inativo não pode ser editado.
+   * Regra: atleta inativo não pode ter treinos editados.
    */
   update: publicProcedure
-    .input(z.object({
-      id: z.coerce.number().int().positive(),
-      data: updateTrainingSchema,
-    }))
+    .input(
+      z.object({
+        id: z.coerce.number().int().positive(),
+        data: updateTrainingSchema,
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       const { id, data } = input;
 
+      const [training] = await ctx.db
+        .select()
+        .from(trainings)
+        .where(eq(trainings.id, id));
+
+      if (!training) {
+        throw trainingNotFound();
+      }
+
+      if (training.deletedAt) {
+        throw conflictError("Não é possível editar um treino desativado.");
+      }
+
+      const [athlete] = await ctx.db
+        .select()
+        .from(athletes)
+        .where(eq(athletes.id, training.athleteId));
+
+      if (!athlete) {
+        throw athleteNotFound();
+      }
+
+      if (athlete.deletedAt) {
+        throw conflictError(
+          "Não é possível realizar esta operação em treinos de um atleta desativado.",
+        );
+      }
+
       try {
-        // Verificar se treino existe e não está desativado
-        const [existingTraining] = await ctx.db
-          .select()
-          .from(trainings)
-          .where(eq(trainings.id, id));
-
-        if (!existingTraining) {
-          throw new Error("Treino não encontrado");
-        }
-
-        if (existingTraining.deletedAt) {
-          throw new Error("Não é possível editar treinos desativados");
-        }
-
         const [training] = await ctx.db
           .update(trainings)
           .set({
@@ -177,83 +206,105 @@ export const trainingRouter = t.router({
           .where(eq(trainings.id, id))
           .returning();
 
-        return {
-          success: true,
-          data: training,
-        };
+        return { success: true, data: training };
       } catch (error) {
-        console.error("Erro ao atualizar treino:", error);
-        throw new Error("Falha ao atualizar treino");
+        if (isTRPCError(error)) throw error;
+
+        throw internalError("atualizar treino", error);
       }
     }),
 
   /**
-   * Desativar treino (soft delete)
+   * Desativar treino (soft-delete).
+   * Regra: treino já inativo retorna CONFLICT.
+   * Nota: desativar treino de atleta inativo é permitido (reduz inconsistência de dados).
    */
   delete: publicProcedure
     .input(deleteTrainingSchema)
     .mutation(async ({ input, ctx }) => {
+      const [training] = await ctx.db
+        .select()
+        .from(trainings)
+        .where(eq(trainings.id, input.id));
+
+      if (!training) {
+        throw trainingNotFound();
+      }
+
+      if (training.deletedAt) {
+        throw conflictError("Treino já está desativado.");
+      }
+
       try {
         const [training] = await ctx.db
           .update(trainings)
-          .set({ 
+          .set({
             deletedAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
           })
           .where(eq(trainings.id, input.id))
           .returning();
 
-        if (!training) {
-          throw new Error("Treino não encontrado");
-        }
-
-        return {
-          success: true,
-          data: training,
-        };
+        return { success: true, data: training };
       } catch (error) {
-        console.error("Erro ao desativar treino:", error);
-        throw new Error("Falha ao desativar treino");
+        if (isTRPCError(error)) throw error;
+
+        throw internalError("desativar treino", error);
       }
     }),
 
   /**
-   * Reativar treino (remove soft delete)
+   * Reativar treino (remove soft-delete).
+   * Regra: treino já ativo retorna CONFLICT.
+   * Regra: atleta inativo não pode ter treinos reativados.
+   *        (reativar criaria um treino ativo para um atleta inativo, violando a regra de domínio)
    */
   reactivate: publicProcedure
     .input(reactivateTrainingSchema)
     .mutation(async ({ input, ctx }) => {
+      const [training] = await ctx.db
+        .select()
+        .from(trainings)
+        .where(eq(trainings.id, input.id));
+
+      if (!training) {
+        throw trainingNotFound();
+      }
+
+      if (!training.deletedAt) {
+        throw conflictError("Treino já está ativo.");
+      }
+
+      const [athlete] = await ctx.db
+        .select()
+        .from(athletes)
+        .where(eq(athletes.id, training.athleteId));
+
+      if (!athlete) {
+        throw athleteNotFound();
+      }
+
+      if (athlete.deletedAt) {
+        throw conflictError(
+          "Não é possível realizar esta operação em treinos de um atleta desativado.",
+        );
+      }
+
       try {
-        // Verificar se treino existe e está desativado
-        const [existingTraining] = await ctx.db
-          .select()
-          .from(trainings)
-          .where(eq(trainings.id, input.id));
-
-        if (!existingTraining) {
-          throw new Error("Treino não encontrado");
-        }
-
-        if (!existingTraining.deletedAt) {
-          throw new Error("Treino já está ativo");
-        }
-
         const [training] = await ctx.db
           .update(trainings)
-          .set({ 
+          .set({
             deletedAt: null,
-            updatedAt: new Date()
+            updatedAt: new Date(),
           })
           .where(eq(trainings.id, input.id))
           .returning();
 
-        return {
-          success: true,
-          data: training,
-        };
+        return { success: true, data: training };
       } catch (error) {
-        console.error("Erro ao reativar treino:", error);
-        throw new Error("Falha ao reativar treino");
+        if (isTRPCError(error)) throw error;
+
+        throw internalError("reativar treino", error);
       }
     }),
 });
