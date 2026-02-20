@@ -3,9 +3,12 @@ import { AthleteInsightsKpis } from "./athlete-insights-kpis";
 import { AthleteInsightsPeriodFilter } from "./athlete-insights-period-filter";
 import { AthleteInsightsDistribution } from "./athlete-insights-distribution";
 import { AthleteInsightsHighlights } from "./athlete-insights-highlights";
+import { AthleteInsightsGoals } from "./athlete-insights-goals";
+import { AthleteInsightsRecommendations } from "./athlete-insights-recommendations";
 import type { AthleteInsightsResponse } from "@/shared/types/domain/athlete-insights";
 
 interface AthleteInsightsDashboardProps {
+  athleteId: string;
   insights: AthleteInsightsResponse;
   filters: {
     period: "7" | "30" | "90" | "custom";
@@ -26,6 +29,7 @@ interface AthleteInsightsDashboardProps {
  * Orquestra todos os componentes de visualização
  */
 export function AthleteInsightsDashboard({
+  athleteId,
   insights,
   filters,
   onFilterChange,
@@ -48,6 +52,18 @@ export function AthleteInsightsDashboard({
 
       {/* KPIs */}
       <AthleteInsightsKpis kpis={insights.kpis} />
+
+      {/* Metas e Recomendações */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Metas da Semana */}
+        <AthleteInsightsGoals
+          athleteId={athleteId}
+          timeSeries={insights.timeSeries}
+        />
+
+        {/* Recomendações */}
+        <AthleteInsightsRecommendations insights={insights.insights} />
+      </div>
 
       {/* Conteúdo Principal */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

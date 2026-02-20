@@ -17,22 +17,26 @@ export default function AthleteInsightsPage() {
   const params = useParams();
   const athleteId = Number(params.id);
   const { toast } = useToast();
-  
-  const [insights, setInsights] = useState<AthleteInsightsResponse | null>(null);
+
+  const [insights, setInsights] = useState<AthleteInsightsResponse | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Estado para filtros
   const [period, setPeriod] = useState<"7" | "30" | "90" | "custom">("30");
   const [compare, setCompare] = useState(false);
-  const [intensityFilter, setIntensityFilter] = useState<"ALL" | "low" | "moderate" | "high">("ALL");
+  const [intensityFilter, setIntensityFilter] = useState<
+    "ALL" | "low" | "moderate" | "high"
+  >("ALL");
   const [trainingTypeFilter, setTrainingTypeFilter] = useState("ALL");
 
   const loadInsights = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       const result = await trpcClient.athletes.getInsights.query({
         athleteId,
         period,
@@ -40,12 +44,13 @@ export default function AthleteInsightsPage() {
         intensityFilter,
         trainingTypeFilter,
       });
-      
+
       setInsights(result);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Erro ao carregar insights";
+      const errorMessage =
+        err instanceof Error ? err.message : "Erro ao carregar insights";
       setError(errorMessage);
-      
+
       toast({
         title: "Erro",
         description: errorMessage,
@@ -60,7 +65,14 @@ export default function AthleteInsightsPage() {
     if (athleteId) {
       loadInsights();
     }
-  }, [athleteId, period, compare, intensityFilter, trainingTypeFilter, loadInsights]);
+  }, [
+    athleteId,
+    period,
+    compare,
+    intensityFilter,
+    trainingTypeFilter,
+    loadInsights,
+  ]);
 
   const handleRetry = () => {
     loadInsights();
@@ -79,10 +91,11 @@ export default function AthleteInsightsPage() {
   };
 
   // Verificação determinística de empty state
-  const totalTrainingsKpi = insights?.kpis.find((k) => 
-    k.label.toLowerCase().includes("treino")
+  const totalTrainingsKpi = insights?.kpis.find((k) =>
+    k.label.toLowerCase().includes("treino"),
   );
-  const isEmpty = !insights || !totalTrainingsKpi || totalTrainingsKpi.value === 0;
+  const isEmpty =
+    !insights || !totalTrainingsKpi || totalTrainingsKpi.value === 0;
 
   if (loading) {
     return (
@@ -132,6 +145,7 @@ export default function AthleteInsightsPage() {
       <Navigation />
       <Wrapper>
         <AthleteInsightsDashboard
+          athleteId={String(athleteId)}
           insights={insights}
           filters={{
             period,
