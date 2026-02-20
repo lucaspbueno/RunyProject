@@ -262,13 +262,19 @@ Sistema de definição e acompanhamento de metas:
 - Define meta de **minutos por semana**
 - Define meta de **treinos por semana**
 - Persistência por atleta em **localStorage** (sem necessidade de banco de dados)
-- Barra de progresso visual em tempo real
-- Status: "faltam X minutos" ou "meta atingida"
-- Edição rápida inline
+- Barra de progresso visual em tempo real baseada na semana atual
+- Progresso calculado automaticamente dos treinos da semana ISO
+- Edição rápida inline com validação
+- Badge com data de início da semana atual
 
 **Validações das Metas:**
 - Minutos: 0 a 2000 por semana
 - Treinos: 0 a 14 por semana
+
+**Implementação:**
+- Hook `useAthleteGoals(athleteId)` para gerenciamento de estado
+- Cálculo da semana ISO compatível com backend (segunda-feira)
+- Progresso baseado em `timeSeries` do backend (já inclui `trainingCount`)
 
 #### 8. **Recomendações Não-Médicas** (Diferencial)
 Sugestões baseadas em regras simples e explicáveis:
@@ -277,8 +283,28 @@ Sugestões baseadas em regras simples e explicáveis:
 - **Monotonia alta** → Sugere variar tipo/intensidade
 - **Tendência decrescente** → Sugere revisar frequência
 - **Boa consistência** → Reforço positivo
+- **Padrão estável** → Mantém consistência e monitoramento
+
+**Implementação:**
+- Análise automática dos insights gerados pelo backend
+- Máximo de 3 recomendações visíveis
+- Texto educacional sobre natureza não-médica
+- Resposta instantânea aos filtros (frontend-only)
 
 **Importante:** Não constitui aconselhamento médico. São apenas sugestões educacionais baseadas em padrões comuns.
+
+#### 9. **KPIs com Delta Visual** (Melhoria)
+Indicadores principais com variação visual:
+
+- **Delta visual**: ↑ (positivo), ↓ (negativo), → (neutro)
+- **Percentual de variação** quando compare=true
+- **Microcopy explicativa** em title para "Carga Total"
+- **Cores semânticas**: verde para positivo, vermelho para negativo
+
+**Fórmula da Carga:**
+```typescript
+Carga = duração (min) × intensidade (score)
+```
 
 ### Cálculos Implementados
 

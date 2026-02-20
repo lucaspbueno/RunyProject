@@ -51,18 +51,12 @@ export function AthleteInsightsDashboard({
       </div>
 
       {/* KPIs */}
-      <AthleteInsightsKpis kpis={insights.kpis} />
+      <AthleteInsightsKpis kpis={insights.kpis} compare={filters.compare} />
 
-      {/* Metas e Recomendações */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Metas da Semana */}
-        <AthleteInsightsGoals
-          athleteId={athleteId}
-          timeSeries={insights.timeSeries}
-        />
-
-        {/* Recomendações */}
-        <AthleteInsightsRecommendations insights={insights.insights} />
+      {/* Metas + Recomendações */}
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <AthleteInsightsGoals athleteId={athleteId} insights={insights} />
+        <AthleteInsightsRecommendations insights={insights} />
       </div>
 
       {/* Conteúdo Principal */}

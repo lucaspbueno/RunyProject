@@ -145,7 +145,7 @@ export default function AthleteInsightsPage() {
       <Navigation />
       <Wrapper>
         <AthleteInsightsDashboard
-          athleteId={String(athleteId)}
+          athleteId={athleteId.toString()}
           insights={insights}
           filters={{
             period,

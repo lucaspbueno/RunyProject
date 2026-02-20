@@ -1,161 +1,98 @@
-/**
- * useAthleteGoals Hook
- *
- * Manages athlete weekly goals using localStorage.
- * Goals are athlete-specific and persist across sessions.
- * SSR-safe: only accesses localStorage on the client.
- */
+"use client";
 
-import { useState } from "react";
-import {
-  type AthleteGoals,
-  DEFAULT_ATHLETE_GOALS,
-  GOAL_CONSTRAINTS,
-} from "@/shared/types/domain/athlete-goals";
+import { useCallback, useMemo, useState } from "react";
+import type { AthleteGoals } from "@/shared/types/domain/athlete-goals";
 
-const STORAGE_KEY_PREFIX = "runy:athlete-goals:";
+const DEFAULT_GOALS: AthleteGoals = {
+  weeklyMinutesGoal: 150,
+  weeklyTrainingsGoal: 3,
+};
 
-/**
- * Validates and clamps goal values to acceptable ranges
- */
-function validateGoals(goals: Partial<AthleteGoals>): AthleteGoals {
-  const minutesGoal = Math.max(
-    GOAL_CONSTRAINTS.minMinutes,
-    Math.min(
-      GOAL_CONSTRAINTS.maxMinutes,
-      goals.weeklyMinutesGoal ?? DEFAULT_ATHLETE_GOALS.weeklyMinutesGoal,
-    ),
+const clampInt = (value: number, min: number, max: number) => {
+  if (Number.isNaN(value)) return min;
+  return Math.max(min, Math.min(max, Math.trunc(value)));
+};
+
+const normalizeGoals = (
+  goals: Partial<AthleteGoals> | null | undefined,
+): AthleteGoals => {
+  const weeklyMinutesGoal = clampInt(
+    Number(goals?.weeklyMinutesGoal ?? DEFAULT_GOALS.weeklyMinutesGoal),
+    0,
+    2000,
+  );
+  const weeklyTrainingsGoal = clampInt(
+    Number(goals?.weeklyTrainingsGoal ?? DEFAULT_GOALS.weeklyTrainingsGoal),
+    0,
+    14,
   );
 
-  const trainingsGoal = Math.max(
-    GOAL_CONSTRAINTS.minTrainings,
-    Math.min(
-      GOAL_CONSTRAINTS.maxTrainings,
-      goals.weeklyTrainingsGoal ?? DEFAULT_ATHLETE_GOALS.weeklyTrainingsGoal,
-    ),
-  );
+  return { weeklyMinutesGoal, weeklyTrainingsGoal };
+};
 
-  return {
-    weeklyMinutesGoal: minutesGoal,
-    weeklyTrainingsGoal: trainingsGoal,
-  };
-}
+const makeStorageKey = (athleteId: string) => `runy:athlete-goals:${athleteId}`;
 
-/**
- * Gets storage key for a specific athlete
- */
-function getStorageKey(athleteId: string): string {
-  return `${STORAGE_KEY_PREFIX}${athleteId}`;
-}
-
-/**
- * Loads goals from localStorage (client-side only)
- */
-function loadGoalsFromStorage(athleteId: string): AthleteGoals {
-  if (typeof window === "undefined") {
-    return DEFAULT_ATHLETE_GOALS;
-  }
+function loadFromStorage(athleteId: string): AthleteGoals {
+  if (typeof window === "undefined") return DEFAULT_GOALS;
 
   try {
-    const stored = localStorage.getItem(getStorageKey(athleteId));
-    if (!stored) {
-      return DEFAULT_ATHLETE_GOALS;
-    }
-
-    const parsed = JSON.parse(stored) as Partial<AthleteGoals>;
-    return validateGoals(parsed);
-  } catch (error) {
-    console.warn("Failed to load athlete goals from localStorage:", error);
-    return DEFAULT_ATHLETE_GOALS;
+    const raw = window.localStorage.getItem(makeStorageKey(athleteId));
+    if (!raw) return DEFAULT_GOALS;
+    const parsed = JSON.parse(raw) as Partial<AthleteGoals>;
+    return normalizeGoals(parsed);
+  } catch {
+    return DEFAULT_GOALS;
   }
 }
 
-/**
- * Saves goals to localStorage (client-side only)
- */
-function saveGoalsToStorage(athleteId: string, goals: AthleteGoals): void {
-  if (typeof window === "undefined") {
-    return;
-  }
+export function useAthleteGoals(athleteId: string) {
+  const storageKey = useMemo(() => makeStorageKey(athleteId), [athleteId]);
 
-  try {
-    localStorage.setItem(getStorageKey(athleteId), JSON.stringify(goals));
-  } catch (error) {
-    console.error("Failed to save athlete goals to localStorage:", error);
-    throw error;
-  }
-}
-
-export interface UseAthleteGoalsReturn {
-  /** Current goals for the athlete */
-  goals: AthleteGoals;
-
-  /** Whether goals are loaded (client-side only) */
-  isLoaded: boolean;
-
-  /** Updates goals and persists to localStorage */
-  setGoals: (goals: AthleteGoals) => void;
-
-  /** Resets goals to defaults */
-  resetGoals: () => void;
-}
-
-/**
- * Hook to manage athlete weekly goals
- *
- * @param athleteId - The athlete's ID
- * @returns Goals state and setter functions
- *
- * @example
- * ```tsx
- * const { goals, isLoaded, setGoals } = useAthleteGoals(athleteId);
- *
- * if (!isLoaded) return null;
- *
- * return (
- *   <div>
- *     <input
- *       value={goals.weeklyMinutesGoal}
- *       onChange={(e) => setGoals({ ...goals, weeklyMinutesGoal: +e.target.value })}
- *     />
- *   </div>
- * );
- * ```
- */
-export function useAthleteGoals(athleteId: string): UseAthleteGoalsReturn {
-  // SSR-safe: lazy initialization only runs once on client
+  // Lazy initialization - only runs once on mount, client-safe
   const [goals, setGoalsState] = useState<AthleteGoals>(() =>
-    loadGoalsFromStorage(athleteId),
+    loadFromStorage(athleteId),
   );
 
-  // Track if we're on client side
   const isLoaded = typeof window !== "undefined";
 
-  // Handle athleteId changes by directly updating state
-  // This is acceptable as it's driven by prop change, not arbitrary effect
+  // Track previous athleteId to detect changes
   const [prevAthleteId, setPrevAthleteId] = useState(athleteId);
 
+  // Derived state pattern: update when athleteId changes
   if (prevAthleteId !== athleteId) {
     setPrevAthleteId(athleteId);
-    const loaded = loadGoalsFromStorage(athleteId);
-    setGoalsState(loaded);
+    setGoalsState(loadFromStorage(athleteId));
   }
 
-  const setGoals = (newGoals: AthleteGoals) => {
-    const validated = validateGoals(newGoals);
-    setGoalsState(validated);
-    saveGoalsToStorage(athleteId, validated);
-  };
+  const saveGoals = useCallback(
+    (next: Partial<AthleteGoals>) => {
+      const normalized = normalizeGoals({ ...goals, ...next });
+      setGoalsState(normalized);
+      try {
+        window.localStorage.setItem(storageKey, JSON.stringify(normalized));
+        return { ok: true as const };
+      } catch {
+        return {
+          ok: false as const,
+          error: "Não foi possível salvar as metas no navegador.",
+        };
+      }
+    },
+    [goals, storageKey],
+  );
 
-  const resetGoals = () => {
-    setGoalsState(DEFAULT_ATHLETE_GOALS);
-    saveGoalsToStorage(athleteId, DEFAULT_ATHLETE_GOALS);
-  };
+  const resetGoals = useCallback(() => {
+    setGoalsState(DEFAULT_GOALS);
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(DEFAULT_GOALS));
+      return { ok: true as const };
+    } catch {
+      return {
+        ok: false as const,
+        error: "Não foi possível resetar as metas no navegador.",
+      };
+    }
+  }, [storageKey]);
 
-  return {
-    goals,
-    isLoaded,
-    setGoals,
-    resetGoals,
-  };
+  return { goals, saveGoals, resetGoals, isLoaded };
 }

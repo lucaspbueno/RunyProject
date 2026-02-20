@@ -1,71 +1,80 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+"use client";
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AthleteInsightKpi } from "@/shared/types/domain/athlete-insights";
 
 interface AthleteInsightsKpisProps {
   kpis: AthleteInsightKpi[];
+  compare?: boolean;
+}
+
+function getDeltaColor(delta?: number) {
+  if (delta === undefined) return "text-muted-foreground";
+  if (delta === 0) return "text-muted-foreground";
+  return delta > 0 ? "text-green-600" : "text-red-600";
+}
+
+function formatPercent(p?: number) {
+  if (p === undefined || !Number.isFinite(p)) return "";
+  const sign = p > 0 ? "+" : "";
+  return `${sign}${p.toFixed(0)}%`;
+}
+
+function getDeltaPercent(current: number, previous: number): number {
+  if (previous === 0) return current > 0 ? 100 : 0;
+  return ((current - previous) / previous) * 100;
 }
 
 /**
  * Grid de KPIs com deltas e tendências
  * Exibe 4 métricas principais com indicadores de variação
  */
-export function AthleteInsightsKpis({ kpis }: AthleteInsightsKpisProps) {
-  const getTrendIcon = (trend?: "up" | "down" | "stable") => {
-    switch (trend) {
-      case "up":
-        return <TrendingUp className="h-4 w-4 text-green-600" />;
-      case "down":
-        return <TrendingDown className="h-4 w-4 text-red-600" />;
-      case "stable":
-        return <Minus className="h-4 w-4 text-gray-400" />;
-      default:
-        return null;
-    }
-  };
-
-  const getDeltaColor = (delta?: number) => {
-    if (delta === undefined) return "text-gray-500";
-    return delta > 0 ? "text-green-600" : delta < 0 ? "text-red-600" : "text-gray-500";
-  };
-
-  const formatDelta = (delta?: number) => {
-    if (delta === undefined) return "";
-    const sign = delta > 0 ? "+" : "";
-    return `${sign}${delta}`;
-  };
-
+export function AthleteInsightsKpis({ kpis, compare = false }: AthleteInsightsKpisProps) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {kpis.map((kpi, index) => (
-        <Card key={index}>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-muted-foreground">
-                  {kpi.label}
-                </p>
-                <p className="text-2xl font-bold">
-                  {kpi.value.toLocaleString("pt-BR")}
-                  <span className="text-sm font-normal text-muted-foreground ml-1">
-                    {kpi.unit}
-                  </span>
-                </p>
-                
-                {/* Delta e Trend */}
-                {kpi.delta !== undefined && (
-                  <div className="flex items-center gap-1 mt-1">
-                    {getTrendIcon(kpi.trend)}
-                    <span className={`text-sm font-medium ${getDeltaColor(kpi.delta)}`}>
-                      {formatDelta(kpi.delta)} {kpi.unit}
-                    </span>
-                  </div>
-                )}
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      {kpis.map((kpi) => {
+        const deltaValue = kpi.delta;
+        const deltaPercent = deltaValue !== undefined && kpi.value !== 0 
+          ? getDeltaPercent(kpi.value, kpi.value - deltaValue)
+          : undefined;
+
+        const showDelta = compare && deltaValue !== undefined;
+        const arrow = deltaValue !== undefined ? (deltaValue > 0 ? "↑" : deltaValue < 0 ? "↓" : "→") : "→";
+
+        const labelTitle =
+          kpi.label.toLowerCase().includes("carga")
+            ? "Carga = duração (min) × intensidade (score)"
+            : undefined;
+
+        return (
+          <Card key={kpi.label}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium" title={labelTitle}>
+                {kpi.label}
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="space-y-1">
+              <div className="text-2xl font-semibold">
+                {kpi.value.toLocaleString("pt-BR")} <span className="text-sm font-normal text-muted-foreground">{kpi.unit}</span>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+
+              {showDelta ? (
+                <div className={`text-sm ${getDeltaColor(deltaValue)}`}>
+                  {arrow}{" "}
+                  <span className="font-medium">
+                    {deltaValue !== undefined ? `${Math.abs(deltaValue)}` : ""}
+                    {deltaPercent !== undefined ? ` (${formatPercent(deltaPercent)})` : ""}
+                  </span>{" "}
+                  <span className="text-muted-foreground">vs período anterior</span>
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">—</div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }
