@@ -8,19 +8,47 @@ import {
   createAthleteSchema,
   updateAthleteSchema,
   listAthletesSchema,
+  getAthleteSchema,
   deleteAthleteSchema,
   reactivateAthleteSchema,
 } from "../../../shared/schemas/athlete-schema";
 import type { PaginatedResponse } from "../../../shared/types";
+import {
+  athleteNotFound,
+  conflictError,
+  databaseConnectionError,
+  internalError,
+  isConnectionError,
+  isTRPCError,
+  isUniqueViolation,
+} from "../errors";
 
 /**
- * Router tRPC para operações CRUD de atletas
- * Inclui validação Zod e paginação
+ * Router tRPC para operações CRUD de atletas.
+ * Todos os erros usam TRPCError com códigos semânticos.
  */
-
 export const athleteRouter = t.router({
   /**
-   * Criar novo atleta
+   * Buscar atleta por ID.
+   * Retorna o atleta independente de status (ativo/inativo).
+   */
+  getById: publicProcedure
+    .input(getAthleteSchema)
+    .query(async ({ input, ctx }) => {
+      const [athlete] = await ctx.db
+        .select()
+        .from(athletes)
+        .where(eq(athletes.id, input.id));
+
+      if (!athlete) {
+        throw athleteNotFound();
+      }
+
+      return athlete;
+    }),
+
+  /**
+   * Criar novo atleta.
    */
   create: publicProcedure
     .input(createAthleteSchema)
@@ -34,24 +62,24 @@ export const athleteRouter = t.router({
           })
           .returning();
 
-        return {
-          success: true,
-          data: athlete,
-        };
+        return { success: true, data: athlete };
       } catch (error) {
-        console.error("Erro ao criar atleta:", error);
-        
-        // Verificar se é erro de conexão
-        if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
-          throw new Error("Não foi possível conectar ao banco de dados. Verifique se o serviço está disponível.");
+        if (isUniqueViolation(error)) {
+          throw conflictError(
+            "Já existe um atleta cadastrado com este e-mail.",
+          );
         }
-        
-        throw new Error("Falha ao criar atleta");
+
+        if (isConnectionError(error)) {
+          throw databaseConnectionError(error);
+        }
+
+        throw internalError("criar atleta", error);
       }
     }),
 
   /**
-   * Listar atletas com paginação e busca
+   * Listar atletas com paginação.
    */
   list: publicProcedure
     .input(listAthletesSchema)
@@ -60,7 +88,6 @@ export const athleteRouter = t.router({
       const offset = (page - 1) * limit;
 
       try {
-        // Buscar total de registros (apenas não excluídos)
         const totalCountQuery = ctx.db
           .select({ count: count() })
           .from(athletes);
@@ -69,7 +96,6 @@ export const athleteRouter = t.router({
           ? await totalCountQuery
           : await totalCountQuery.where(isNull(athletes.deletedAt));
 
-        // Buscar registros paginados (apenas não excluídos)
         const itemsQuery = ctx.db
           .select()
           .from(athletes)
@@ -83,7 +109,7 @@ export const athleteRouter = t.router({
 
         const totalPages = Math.ceil(totalCount / limit);
 
-        const response: PaginatedResponse<typeof items[0]> = {
+        const response: PaginatedResponse<(typeof items)[0]> = {
           items,
           totalCount,
           currentPage: page,
@@ -94,37 +120,52 @@ export const athleteRouter = t.router({
 
         return response;
       } catch (error) {
-        console.error("Erro ao listar atletas:", error);
-        
-        // Verificar se é erro de conexão
-        if (error instanceof Error && error.message.includes('ECONNREFUSED')) {
-          throw new Error("Não foi possível conectar ao banco de dados. Verifique se o serviço está disponível.");
+        if (isTRPCError(error)) throw error;
+
+        if (isConnectionError(error)) {
+          throw databaseConnectionError(error);
         }
-        
-        throw new Error("Falha ao listar atletas");
+
+        throw internalError("listar atletas", error);
       }
     }),
 
   /**
-   * Atualizar atleta existente
+   * Atualizar atleta existente.
+   * Regra P0.2: atleta inativo não pode ser editado.
    */
   update: publicProcedure
-    .input(z.object({
-      id: z.coerce.number().int().positive(),
-      data: updateAthleteSchema,
-    }))
+    .input(
+      z.object({
+        id: z.coerce.number().int().positive(),
+        data: updateAthleteSchema,
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       const { id, data } = input;
 
+      const [existing] = await ctx.db
+        .select()
+        .from(athletes)
+        .where(eq(athletes.id, id));
+
+      if (!existing) {
+        throw athleteNotFound();
+      }
+
+      if (existing.deletedAt) {
+        throw conflictError("Não é possível editar um atleta desativado.");
+      }
+
       try {
-        const updateData: any = {
-          ...data,
+        // Separar dateOfBirth para conversão de string → Date sem usar any
+        const { dateOfBirth: dateOfBirthStr, ...rest } = data;
+
+        const updateData = {
+          ...rest,
           updatedAt: new Date(),
+          ...(dateOfBirthStr ? { dateOfBirth: new Date(dateOfBirthStr) } : {}),
         };
-        
-        if (data.dateOfBirth) {
-          updateData.dateOfBirth = new Date(data.dateOfBirth);
-        }
 
         const [athlete] = await ctx.db
           .update(athletes)
@@ -132,70 +173,79 @@ export const athleteRouter = t.router({
           .where(eq(athletes.id, id))
           .returning();
 
-        if (!athlete) {
-          throw new Error("Atleta não encontrado");
+        return { success: true, data: athlete };
+      } catch (error) {
+        if (isTRPCError(error)) throw error;
+
+        if (isUniqueViolation(error)) {
+          throw conflictError(
+            "Já existe um atleta cadastrado com este e-mail.",
+          );
         }
 
-        return {
-          success: true,
-          data: athlete,
-        };
-      } catch (error) {
-        console.error("Erro ao atualizar atleta:", error);
-        throw new Error("Falha ao atualizar atleta");
+        throw internalError("atualizar atleta", error);
       }
     }),
 
   /**
-   * Desativar atleta (soft delete)
+   * Desativar atleta (soft-delete).
+   * Regra P0.2: atleta já inativo retorna CONFLICT.
    */
   delete: publicProcedure
     .input(deleteAthleteSchema)
     .mutation(async ({ input, ctx }) => {
+      const [existing] = await ctx.db
+        .select()
+        .from(athletes)
+        .where(eq(athletes.id, input.id));
+
+      if (!existing) {
+        throw athleteNotFound();
+      }
+
+      if (existing.deletedAt) {
+        throw conflictError("Atleta já está desativado.");
+      }
+
       try {
         const [athlete] = await ctx.db
           .update(athletes)
-          .set({ 
+          .set({
             deletedAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
           })
           .where(eq(athletes.id, input.id))
           .returning();
 
-        if (!athlete) {
-          throw new Error("Atleta não encontrado");
-        }
-
-        return {
-          success: true,
-          data: athlete,
-        };
+        return { success: true, data: athlete };
       } catch (error) {
-        console.error("Erro ao desativar atleta:", error);
-        throw new Error("Falha ao desativar atleta");
+        if (isTRPCError(error)) throw error;
+
+        throw internalError("desativar atleta", error);
       }
     }),
 
   /**
-   * Reativar atleta (remove soft delete)
+   * Reativar atleta (remove soft-delete).
+   * Regra P0.2: atleta já ativo retorna CONFLICT.
    */
   reactivate: publicProcedure
     .input(reactivateAthleteSchema)
     .mutation(async ({ input, ctx }) => {
+      const [existing] = await ctx.db
+        .select()
+        .from(athletes)
+        .where(eq(athletes.id, input.id));
+
+      if (!existing) {
+        throw athleteNotFound();
+      }
+
+      if (!existing.deletedAt) {
+        throw conflictError("Atleta já está ativo.");
+      }
+
       try {
-        const [existingAthlete] = await ctx.db
-          .select()
-          .from(athletes)
-          .where(eq(athletes.id, input.id));
-
-        if (!existingAthlete) {
-          throw new Error("Atleta não encontrado");
-        }
-
-        if (!existingAthlete.deletedAt) {
-          throw new Error("Atleta já está ativo");
-        }
-
         const [athlete] = await ctx.db
           .update(athletes)
           .set({
@@ -205,13 +255,11 @@ export const athleteRouter = t.router({
           .where(eq(athletes.id, input.id))
           .returning();
 
-        return {
-          success: true,
-          data: athlete,
-        };
+        return { success: true, data: athlete };
       } catch (error) {
-        console.error("Erro ao reativar atleta:", error);
-        throw new Error("Falha ao reativar atleta");
+        if (isTRPCError(error)) throw error;
+
+        throw internalError("reativar atleta", error);
       }
     }),
 });
