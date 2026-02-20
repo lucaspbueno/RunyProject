@@ -71,19 +71,6 @@ export function calculateAverageIntensityScore(trainings: TrainingDTO[]): number
 }
 
 /**
- * Agrupa treinos por semana ISO (YYYY-WW) - Wrapper de calculateWeeklyTimeSeries
- */
-export function groupTrainingsByISOWeek(trainings: TrainingDTO[]): WeeklyAggregate[] {
-  const timeSeries = calculateWeeklyTimeSeries(trainings);
-  return timeSeries.map(week => ({
-    weekStart: week.weekStart,
-    totalMinutes: week.minutes,
-    totalLoad: week.load,
-    trainingCount: week.trainingsCount,
-  }));
-}
-
-/**
  * Calcula índice de monotonia (mean / stdDev)
  * Retorna null se dados insuficientes (< 3 semanas)
  */
@@ -234,7 +221,7 @@ export function calculateWeeklyTimeSeries(trainings: TrainingDTO[]): Array<{
   
   Array.from(weeksMap.entries())
     .sort(([a], [b]) => a.localeCompare(b))
-    .forEach(([weekKey, weekTrainings]) => {
+    .forEach(([_weekKey, weekTrainings]) => {
       // Usar o primeiro treino da semana como referência para calcular o início da semana ISO
       const firstTraining = weekTrainings[0];
       const weekStart = startOfISOWeek(new Date(firstTraining.createdAt));

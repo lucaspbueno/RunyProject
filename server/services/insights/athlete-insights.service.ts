@@ -8,7 +8,6 @@ import {
   calculateIntensityDistribution,
   calculateTypeDistribution,
   getTopTrainingsByLoad,
-  groupTrainingsByISOWeek,
   computeMonotonyIndex,
   detectSpike,
   computeConsistency,
@@ -50,7 +49,13 @@ export function buildAthleteInsights(params: {
   });
 
   // Gerar agregados semanais para cálculos inteligentes
-  const weeklyAggregates = groupTrainingsByISOWeek(filteredCurrent);
+  const weeklyTimeSeries = calculateWeeklyTimeSeries(filteredCurrent);
+  const weeklyAggregates = weeklyTimeSeries.map(week => ({
+    weekStart: week.weekStart,
+    totalMinutes: week.minutes,
+    totalLoad: week.load,
+    trainingCount: week.trainingsCount,
+  }));
 
   // Calcular KPIs básicos
   const kpis = buildKPIs(filteredCurrent, filteredCompare);

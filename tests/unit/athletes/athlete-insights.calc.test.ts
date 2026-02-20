@@ -2,13 +2,12 @@ import { describe, it, expect } from "vitest";
 import {
   calculateTrainingLoad,
   calculateAverageIntensityScore,
-  groupTrainingsByISOWeek,
+  calculateWeeklyTimeSeries,
   computeMonotonyIndex,
   detectSpike,
   computeConsistency,
   computeTrend,
   type WeeklyAggregate,
-  type SpikeResult,
   type TrainingDTO,
 } from "@/server/services/insights/athlete-insights.calc";
 
@@ -58,7 +57,7 @@ describe("AthleteInsightsCalc", () => {
     });
   });
 
-  describe("groupTrainingsByISOWeek", () => {
+  describe("calculateWeeklyTimeSeries", () => {
     it("deve agrupar por semana ISO corretamente", () => {
       const trainings = [
         { ...mockTraining, createdAt: new Date("2024-01-01T10:00:00Z") }, // Segunda
@@ -66,24 +65,26 @@ describe("AthleteInsightsCalc", () => {
         { ...mockTraining, createdAt: new Date("2024-01-08T10:00:00Z") }, // Segunda próxima semana
       ];
 
-      const result = groupTrainingsByISOWeek(trainings);
+      const result = calculateWeeklyTimeSeries(trainings);
       
       expect(result).toHaveLength(2);
       
       // Primeira semana (W1)
-      const week1 = result.find(w => w.weekStart.startsWith("2024-01-01"));
+      const week1 = result.find((w) => w.weekStart.startsWith("2024-01-01"));
       expect(week1).toBeDefined();
-      expect(week1!.trainingCount).toBe(2);
-      expect(week1!.totalLoad).toBe(120); // 60 + 60
+      expect(week1!.trainingsCount).toBe(2);
+      expect(week1!.load).toBe(120); // 60 + 60
+      expect(week1!.minutes).toBe(60); // 30 + 30
       
       // Segunda semana (W2)
-      const week2 = result.find(w => w.weekStart.startsWith("2024-01-08"));
+      const week2 = result.find((w) => w.weekStart.startsWith("2024-01-08"));
       expect(week2).toBeDefined();
-      expect(week2!.trainingCount).toBe(1);
+      expect(week2!.trainingsCount).toBe(1);
+      expect(week2!.minutes).toBe(30);
     });
 
     it("deve retornar array vazio para sem treinos", () => {
-      const result = groupTrainingsByISOWeek([]);
+      const result = calculateWeeklyTimeSeries([]);
       expect(result).toEqual([]);
     });
   });
