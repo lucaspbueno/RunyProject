@@ -3,41 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { trpcClient } from "@/lib/trpc-client";
 import { useToast } from "@/hooks/use-toast";
-
-interface Athlete {
-  id: number;
-  name: string;
-  email: string;
-  dateOfBirth: Date | string;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  deletedAt?: Date | string | null;
-}
-
-interface PaginatedAthletes {
-  items: Athlete[];
-  totalCount: number;
-  currentPage: number;
-  totalPages: number;
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-}
-
-interface UseAthletesListOptions {
-  includeDeleted?: boolean;
-  initialPage?: number;
-  limit?: number;
-}
-
-interface UseAthletesListReturn {
-  athletes: PaginatedAthletes | null;
-  loading: boolean;
-  error: Error | null;
-  currentPage: number;
-  loadAthletes: (page?: number) => Promise<void>;
-  refetch: () => Promise<void>;
-  setCurrentPage: (page: number) => void;
-}
+import type { Athlete, PaginatedResponse } from "@/shared/types";
+import type { UseAthletesListOptions, UseAthletesListReturn } from "@/shared/types";
 
 /**
  * Hook para gerenciar lista de atletas com paginação
@@ -48,7 +15,7 @@ export function useAthletesList({
   initialPage = 1,
   limit = 10
 }: UseAthletesListOptions = {}): UseAthletesListReturn {
-  const [athletes, setAthletes] = useState<PaginatedAthletes | null>(null);
+  const [athletes, setAthletes] = useState<PaginatedResponse<Athlete> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [currentPage, setCurrentPage] = useState(initialPage);
