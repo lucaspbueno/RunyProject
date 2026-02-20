@@ -17,21 +17,3 @@ export type AthleteFilter = {
   email?: string;
   includeDeleted?: boolean;
 };
-
-// Tipos de insights específicos de atleta
-export interface AthleteInsightKpi {
-  label: string;
-  value: number;
-  delta?: number;
-  unit: string;
-  trend?: "up" | "down" | "stable";
-}
-
-export interface AthleteInsight {
-  id: string;
-  severity: "info" | "warning" | "critical";
-  title: string;
-  description: string;
-  evidence?: string;
-  type: "monotony" | "spike" | "consistency" | "trend";
-}
