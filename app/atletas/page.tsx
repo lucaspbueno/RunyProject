@@ -15,16 +15,7 @@ import { useAthletesList } from "@/hooks/athletes/use-athletes-list";
 import { trpcClient } from "@/lib/trpc-client";
 import { useToast } from "@/hooks/use-toast";
 import { Users } from "lucide-react";
-
-interface Athlete {
-  id: number;
-  name: string;
-  email: string;
-  dateOfBirth: Date | string;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-  deletedAt?: Date | string | null;
-}
+import type { Athlete } from "@/shared/types";
 
 export default function AtletasPage() {
   const [mostrarDesativados, setMostrarDesativados] = useState(false);
@@ -180,7 +171,7 @@ export default function AtletasPage() {
         open={modalAberto}
         onOpenChange={setModalAberto}
         onReactivate={handleReactivate}
-        reactivatingId={reactivatingId}
+        reactivatingId={reactivatingId as number | null}
       />
     </Wrapper>
   );

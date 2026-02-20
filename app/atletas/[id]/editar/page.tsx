@@ -12,21 +12,7 @@ import { trpcClient } from "@/lib/trpc-client";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Save } from "lucide-react";
 import Link from "next/link";
-
-interface Athlete {
-  id: number;
-  name: string;
-  email: string;
-  dateOfBirth: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface UpdateAthleteForm {
-  name: string;
-  email: string;
-  dateOfBirth: string;
-}
+import type { Athlete, UpdateAthleteForm } from "@/shared/types";
 
 export default function EditarAtletaPage() {
   const router = useRouter();

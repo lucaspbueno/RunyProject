@@ -12,22 +12,7 @@ import { trpcClient } from "@/lib/trpc-client";
 import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Save, Zap } from "lucide-react";
 import Link from "next/link";
-
-interface Athlete {
-  id: number;
-  name: string;
-  email: string;
-  dateOfBirth: Date;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface CreateTrainingForm {
-  type: string;
-  durationMinutes: string;
-  intensity: "low" | "moderate" | "high";
-  notes?: string;
-}
+import type { Athlete, CreateTrainingForm } from "@/shared/types";
 
 const intensityOptions = [
   { value: "low", label: "Baixa", description: "Treino leve, aquecimento ou recuperação" },
