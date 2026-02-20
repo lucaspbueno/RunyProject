@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TRAINING_INTENSITY_VALUES } from "@/shared/constants/training-intensity";
+import { TRAINING_INTENSITY_VALUES } from "../constants/training-intensity";
 
 /**
  * Schema Zod para validação de dados de treino
