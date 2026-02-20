@@ -1,40 +1,25 @@
 import { Button } from "@/components/ui/button";
 import { RotateCcw, Loader2 } from "lucide-react";
-
-interface EntityWithId {
-  id: number | string;
-}
-
-interface ReactivateButtonProps {
-  entity: EntityWithId;
-  onReactivate: (id: number | string) => void;
-  reactivatingId?: number | string | null;
-  disabled?: boolean;
-  text?: string;
-  loadingText?: string;
-  title?: string;
-  size?: "sm" | "default" | "lg";
-  variant?: "default" | "outline" | "ghost";
-}
+import type { ReactivateButtonProps } from "@/shared/types/ui/actions";
 
 /**
  * Botão de reativação genérico com loading state
  */
-export function ReactivateButton({ 
-  entity, 
-  onReactivate, 
+export function ReactivateButton({
+  entity,
+  onReactivate,
   reactivatingId = null,
   disabled = false,
   text = "Reativar",
   loadingText = "Reativando...",
   title = "Reativar item",
   size = "sm",
-  variant = "outline"
+  variant = "outline",
 }: ReactivateButtonProps) {
   const isLoading = reactivatingId === entity.id;
 
   return (
-    <Button 
+    <Button
       variant={variant}
       size={size}
       onClick={() => onReactivate(entity.id)}

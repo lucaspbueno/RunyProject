@@ -1,32 +1,25 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Trash2, Loader2 } from "lucide-react";
-
-interface EntityWithId {
-  id: number | string;
-  name?: string;
-}
-
-interface DeleteButtonProps {
-  entity: EntityWithId;
-  onDelete: (id: number | string) => void;
-  deletingId?: number | string | null;
-  disabled?: boolean;
-  title?: string;
-  description?: string;
-  confirmText?: string;
-  cancelText?: string;
-  size?: "sm" | "default" | "lg";
-  variant?: "default" | "outline" | "ghost";
-}
+import type { DeleteButtonProps } from "@/shared/types/ui/actions";
 
 /**
  * Botão de exclusão genérico com confirmação e loading state
  */
-export function DeleteButton({ 
-  entity, 
-  onDelete, 
+export function DeleteButton({
+  entity,
+  onDelete,
   deletingId = null,
   disabled = false,
   title = "Confirmar desativação",
@@ -34,7 +27,7 @@ export function DeleteButton({
   confirmText = "Desativar",
   cancelText = "Cancelar",
   size = "sm",
-  variant = "outline"
+  variant = "outline",
 }: DeleteButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const isLoading = deletingId === entity.id;
@@ -47,11 +40,7 @@ export function DeleteButton({
   return (
     <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
       <AlertDialogTrigger asChild>
-        <Button 
-          variant={variant} 
-          size={size}
-          disabled={disabled || isLoading}
-        >
+        <Button variant={variant} size={size} disabled={disabled || isLoading}>
           {isLoading ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (
@@ -62,9 +51,7 @@ export function DeleteButton({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
-          <AlertDialogDescription>
-            {description}
-          </AlertDialogDescription>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isLoading}>
