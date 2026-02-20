@@ -1,4 +1,4 @@
-import { dbScripts } from "@/scripts/scripts.connection";
+import { dbScripts, closeDbConnection } from "@/scripts/scripts.connection";
 import { athletes, trainings } from "@/server/db/schema/tables";
 
 /**
@@ -222,10 +222,14 @@ async function seed() {
       • ${insertedTrainings.length} treinos inseridos (${insertedTrainings.length / insertedAthletes.length} por atleta)
     `
   );
-
 }
 
-seed().catch((err) => {
-  console.error("❌ Erro ao executar seed:", err);
-  process.exit(1);
-});
+seed()
+  .then(() => console.log("🌱 Seed finalizado com sucesso!"))
+  .catch((err) => {
+    console.error("❌ Erro ao executar seed:", err);
+    process.exit(1);
+  })
+  .finally(() => {
+    closeDbConnection();
+  });

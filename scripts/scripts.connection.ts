@@ -11,3 +11,7 @@ if (!connectionString) {
 const client = postgres(connectionString, { prepare: false });
 
 export const dbScripts = drizzle(client, { schema });
+
+export const closeDbConnection = () => {
+  client.end();
+};
