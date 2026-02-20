@@ -16,6 +16,7 @@ services:
       - .:/app
       - /app/node_modules
       - /app/.next
+      - ./server:/app/server
     restart: unless-stopped
 
   db:
