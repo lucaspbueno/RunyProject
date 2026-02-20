@@ -1,13 +1,13 @@
+"use client";
+
 import { type MouseEvent } from "react";
-import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { formatDateBR, calculateAge } from "@/lib/date";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import Link from "next/link";
-import { Edit, Trash2, Calendar, Mail, Loader2 } from "lucide-react";
+import { Calendar, Mail } from "lucide-react";
+import { AthleteActions } from "./athlete-actions";
 
 interface Athlete {
   id: number;
@@ -21,11 +21,9 @@ interface Athlete {
 
 interface AthletesTableProps {
   athletes: Athlete[];
-  deletingId: number | null;
-  confirmacaoDesativarId: number | null;
+  deletingId: number | string | null;
   onRowClick: (athlete: Athlete, event: MouseEvent) => void;
-  onDelete: (id: number) => void;
-  onConfirmacaoDesativarChange: (id: number | null) => void;
+  onDelete: (id: number | string) => void;
 }
 
 /**
@@ -34,10 +32,8 @@ interface AthletesTableProps {
 export function AthletesTable({
   athletes,
   deletingId,
-  confirmacaoDesativarId,
   onRowClick,
   onDelete,
-  onConfirmacaoDesativarChange
 }: AthletesTableProps) {
   return (
     <div className="rounded-md border">
@@ -90,76 +86,11 @@ export function AthletesTable({
                 </span>
               </TableCell>
               <TableCell className="text-right">
-                <div className="flex justify-end space-x-2">
-                  {athlete.deletedAt ? (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled
-                      className="opacity-40 pointer-events-none"
-                      title="Não é possível editar atletas desativados"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                  ) : (
-                    <Button variant="outline" size="sm" asChild title="Editar atleta">
-                      <Link href={`/atletas/${athlete.id}/editar`}>
-                        <Edit className="h-4 w-4" />
-                      </Link>
-                    </Button>
-                  )}
-                  
-                  {!athlete.deletedAt && (
-                    <AlertDialog
-                      open={confirmacaoDesativarId === athlete.id}
-                      onOpenChange={(aberto) => {
-                        if (aberto) {
-                          onConfirmacaoDesativarChange(athlete.id);
-                          return;
-                        }
-
-                        onConfirmacaoDesativarChange(
-                          confirmacaoDesativarId === athlete.id ? null : confirmacaoDesativarId
-                        );
-                      }}
-                    >
-                      <AlertDialogTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          disabled={deletingId === athlete.id}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                          }}
-                        >
-                          {deletingId === athlete.id ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Confirmar desativação</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Tem certeza que deseja desativar o atleta {athlete.name}? 
-                            O atleta será desativado mas seus dados serão preservados.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => onDelete(athlete.id)}
-                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                          >
-                            {deletingId === athlete.id ? "Desativando..." : "Desativar"}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  )}
-                </div>
+                <AthleteActions
+                  athlete={athlete}
+                  onDelete={onDelete}
+                  deletingId={deletingId}
+                />
               </TableCell>
             </TableRow>
           ))}

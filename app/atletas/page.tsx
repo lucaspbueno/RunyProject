@@ -28,9 +28,8 @@ interface Athlete {
 
 export default function AtletasPage() {
   const [mostrarDesativados, setMostrarDesativados] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [reactivatingId, setReactivatingId] = useState<number | null>(null);
-  const [confirmacaoDesativarId, setConfirmacaoDesativarId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | string | null>(null);
+  const [reactivatingId, setReactivatingId] = useState<number | string | null>(null);
   const [atletaSelecionado, setAtletaSelecionado] = useState<Athlete | null>(null);
   const [modalAberto, setModalAberto] = useState(false);
   const { toast } = useToast();
@@ -46,10 +45,10 @@ export default function AtletasPage() {
     limit: 10
   });
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: number | string) => {
     try {
       setDeletingId(id);
-      await trpcClient.athletes.delete.mutate({ id });
+      await trpcClient.athletes.delete.mutate({ id: Number(id) });
       
       toast({
         title: "Sucesso",
@@ -69,10 +68,10 @@ export default function AtletasPage() {
     }
   };
 
-  const handleReactivate = async (id: number) => {
+  const handleReactivate = async (id: number | string) => {
     try {
       setReactivatingId(id);
-      await trpcClient.athletes.reactivate.mutate({ id });
+      await trpcClient.athletes.reactivate.mutate({ id: Number(id) });
 
       toast({
         title: "Sucesso",
@@ -97,10 +96,6 @@ export default function AtletasPage() {
     const alvo: HTMLElement = event.target as HTMLElement;
     const clicouEmBotao: Element | null = alvo.closest("button");
     const clicouEmLink: Element | null = alvo.closest("a");
-
-    if (confirmacaoDesativarId !== null) {
-      return;
-    }
 
     if (!clicouEmBotao && !clicouEmLink) {
       setAtletaSelecionado(atleta);
@@ -154,10 +149,8 @@ export default function AtletasPage() {
               <AthletesTable
                 athletes={athletes.items}
                 deletingId={deletingId}
-                confirmacaoDesativarId={confirmacaoDesativarId}
                 onRowClick={handleRowClick}
                 onDelete={handleDelete}
-                onConfirmacaoDesativarChange={setConfirmacaoDesativarId}
               />
 
               <AthletesPagination
