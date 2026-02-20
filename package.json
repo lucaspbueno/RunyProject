@@ -9,13 +9,12 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "docker:build": "docker compose build",
-    "docker:up": "docker compose up --build",
-    "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f",
-    "docker:dev-build": "docker compose -f docker-compose.dev.yml build",
-    "docker:dev-up": "docker compose -f docker-compose.dev.yml up --build",
-    "docker:dev-down": "docker compose -f docker-compose.dev.yml down"
+    "docker:build": "docker compose build",
+    "docker:up": "docker compose up -d",
+    "docker:build-up": "docker compose up -d --build",
+    "docker:down": "docker compose down",
+    "docker:down-clear": "docker compose -v --remove-orphans"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
