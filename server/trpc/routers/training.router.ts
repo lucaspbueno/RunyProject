@@ -11,12 +11,6 @@ import {
   deleteTrainingSchema,
   getTrainingSchema,
   reactivateTrainingSchema,
-  type CreateTrainingInput,
-  type UpdateTrainingInput,
-  type ListTrainingsByAthleteInput,
-  type DeleteTrainingInput,
-  type GetTrainingInput,
-  type ReactivateTrainingInput,
 } from "../../../shared/schemas/training-schema";
 import type { PaginatedResponse } from "../../../shared/types";
 
@@ -80,8 +74,8 @@ export const trainingRouter = t.router({
 
         // Construir condição where base
         const baseCondition = eq(trainings.athleteId, athleteId);
-        const whereCondition = includeDeleted 
-          ? baseCondition 
+        const whereCondition = includeDeleted
+          ? baseCondition
           : and(baseCondition, isNull(trainings.deletedAt));
 
         // Buscar total de registros
@@ -101,7 +95,7 @@ export const trainingRouter = t.router({
 
         const totalPages = Math.ceil(totalCount / limit);
 
-        const response: PaginatedResponse<typeof items[0]> = {
+        const response: PaginatedResponse<(typeof items)[0]> = {
           items,
           totalCount,
           currentPage: page,
@@ -146,10 +140,12 @@ export const trainingRouter = t.router({
    * Atualizar treino existente
    */
   update: publicProcedure
-    .input(z.object({
-      id: z.coerce.number().int().positive(),
-      data: updateTrainingSchema,
-    }))
+    .input(
+      z.object({
+        id: z.coerce.number().int().positive(),
+        data: updateTrainingSchema,
+      }),
+    )
     .mutation(async ({ input, ctx }) => {
       const { id, data } = input;
 
@@ -196,9 +192,9 @@ export const trainingRouter = t.router({
       try {
         const [training] = await ctx.db
           .update(trainings)
-          .set({ 
+          .set({
             deletedAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
           })
           .where(eq(trainings.id, input.id))
           .returning();
@@ -240,9 +236,9 @@ export const trainingRouter = t.router({
 
         const [training] = await ctx.db
           .update(trainings)
-          .set({ 
+          .set({
             deletedAt: null,
-            updatedAt: new Date()
+            updatedAt: new Date(),
           })
           .where(eq(trainings.id, input.id))
           .returning();
