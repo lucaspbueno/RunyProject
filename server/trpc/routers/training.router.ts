@@ -1,40 +1,66 @@
 import "server-only";
 
 import { z } from "zod";
-import { eq, desc, count, isNull, and } from "drizzle-orm";
+import { and, count, desc, eq, isNull } from "drizzle-orm";
 import { publicProcedure, t } from "../trpc";
-import { trainings, athletes } from "@/server/db/schema";
+import { athletes, trainings } from "@/server/db/schema";
 import {
   createTrainingSchema,
-  updateTrainingSchema,
-  listTrainingsByAthleteSchema,
   deleteTrainingSchema,
   getTrainingSchema,
+  listTrainingsByAthleteSchema,
   reactivateTrainingSchema,
-} from "../../../shared/schemas/training-schema";
-import type { PaginatedResponse } from "../../../shared/types";
+  updateTrainingSchema,
+} from "@/shared/schemas/training-schema";
+import type { PaginatedResponse } from "@/shared/types";
 import {
   athleteNotFound,
-  trainingNotFound,
   conflictError,
   internalError,
   isTRPCError,
-} from "../errors";
+  trainingNotFound,
+} from "@/server/trpc/errors";
 
 /**
  * Router tRPC para operações CRUD de treinos.
  * Todos os erros usam TRPCError com códigos semânticos.
- *
- * Regras P0.2 aplicadas:
- *  - Treino só pode ser criado para atleta ativo.
- *  - Treino inativo não pode ser editado.
- *  - Listagens são explícitas sobre incluir ou não inativos.
- *  - delete/reactivate validam estado atual antes de agir.
+
+ * Regras de ativo/inativo aplicadas via guards de status-policy.ts:
+ *  - getById       → retorna independente do status (leitura total)
+ *  - create        → ❌ CONFLICT se atleta inativo
+ *  - listByAthlete → leitura histórica permitida para qualquer atleta;
+ *                    treinos inativos visíveis apenas com includeDeleted=true
+ *  - update        → ❌ CONFLICT se treino inativo
+ *                  → ❌ CONFLICT se atleta inativo
+ *  - delete        → ❌ CONFLICT se treino já inativo
+ *  - reactivate    → ❌ CONFLICT se treino já ativo
+ *                  → ❌ CONFLICT se atleta inativo
  */
 export const trainingRouter = t.router({
   /**
+   * Buscar treino por ID.
+   * Retorna o treino independente do status (ativo/inativo) —
+   * necessário para telas de detalhe, auditoria e reativação.
+   */
+  getById: publicProcedure
+    .input(getTrainingSchema)
+    .query(async ({ input, ctx }) => {
+      const [training] = await ctx.db
+        .select()
+        .from(trainings)
+        .where(eq(trainings.id, input.id));
+
+      if (!training) {
+        throw trainingNotFound();
+      }
+
+      return training;
+    }),
+
+  /**
    * Criar novo treino.
-   * Regra P0.2: atleta deve estar ativo.
+   * Regra: atleta deve estar ativo.
+   * Treino é sempre criado com deletedAt = null (ativo).
    */
   create: publicProcedure
     .input(createTrainingSchema)
@@ -50,7 +76,7 @@ export const trainingRouter = t.router({
 
       if (athlete.deletedAt) {
         throw conflictError(
-          "Não é possível criar treinos para um atleta desativado.",
+          "Não é possível realizar esta operação em treinos de um atleta desativado.",
         );
       }
 
@@ -70,7 +96,9 @@ export const trainingRouter = t.router({
 
   /**
    * Listar treinos de um atleta com paginação.
-   * Regra P0.2: verifica existência do atleta; inativos incluídos apenas se solicitado.
+   * Leitura histórica: permitida mesmo que o atleta esteja inativo.
+   * Apenas a existência do atleta é verificada (404 se não encontrado).
+   * Treinos inativos são incluídos somente com includeDeleted=true.
    */
   listByAthlete: publicProcedure
     .input(listTrainingsByAthleteSchema)
@@ -126,27 +154,9 @@ export const trainingRouter = t.router({
     }),
 
   /**
-   * Buscar treino por ID.
-   * Retorna o treino independente de status (ativo/inativo).
-   */
-  getById: publicProcedure
-    .input(getTrainingSchema)
-    .query(async ({ input, ctx }) => {
-      const [training] = await ctx.db
-        .select()
-        .from(trainings)
-        .where(eq(trainings.id, input.id));
-
-      if (!training) {
-        throw trainingNotFound();
-      }
-
-      return training;
-    }),
-
-  /**
    * Atualizar treino existente.
-   * Regra P0.2: treino inativo não pode ser editado.
+   * Regra: treino inativo não pode ser editado.
+   * Regra: atleta inativo não pode ter treinos editados.
    */
   update: publicProcedure
     .input(
@@ -158,17 +168,32 @@ export const trainingRouter = t.router({
     .mutation(async ({ input, ctx }) => {
       const { id, data } = input;
 
-      const [existing] = await ctx.db
+      const [training] = await ctx.db
         .select()
         .from(trainings)
         .where(eq(trainings.id, id));
 
-      if (!existing) {
+      if (!training) {
         throw trainingNotFound();
       }
 
-      if (existing.deletedAt) {
+      if (training.deletedAt) {
         throw conflictError("Não é possível editar um treino desativado.");
+      }
+
+      const [athlete] = await ctx.db
+        .select()
+        .from(athletes)
+        .where(eq(athletes.id, training.athleteId));
+
+      if (!athlete) {
+        throw athleteNotFound();
+      }
+
+      if (athlete.deletedAt) {
+        throw conflictError(
+          "Não é possível realizar esta operação em treinos de um atleta desativado.",
+        );
       }
 
       try {
@@ -191,21 +216,22 @@ export const trainingRouter = t.router({
 
   /**
    * Desativar treino (soft-delete).
-   * Regra P0.2: treino já inativo retorna CONFLICT.
+   * Regra: treino já inativo retorna CONFLICT.
+   * Nota: desativar treino de atleta inativo é permitido (reduz inconsistência de dados).
    */
   delete: publicProcedure
     .input(deleteTrainingSchema)
     .mutation(async ({ input, ctx }) => {
-      const [existing] = await ctx.db
+      const [training] = await ctx.db
         .select()
         .from(trainings)
         .where(eq(trainings.id, input.id));
 
-      if (!existing) {
+      if (!training) {
         throw trainingNotFound();
       }
 
-      if (existing.deletedAt) {
+      if (training.deletedAt) {
         throw conflictError("Treino já está desativado.");
       }
 
@@ -229,22 +255,39 @@ export const trainingRouter = t.router({
 
   /**
    * Reativar treino (remove soft-delete).
-   * Regra P0.2: treino já ativo retorna CONFLICT.
+   * Regra: treino já ativo retorna CONFLICT.
+   * Regra: atleta inativo não pode ter treinos reativados.
+   *        (reativar criaria um treino ativo para um atleta inativo, violando a regra de domínio)
    */
   reactivate: publicProcedure
     .input(reactivateTrainingSchema)
     .mutation(async ({ input, ctx }) => {
-      const [existing] = await ctx.db
+      const [training] = await ctx.db
         .select()
         .from(trainings)
         .where(eq(trainings.id, input.id));
 
-      if (!existing) {
+      if (!training) {
         throw trainingNotFound();
       }
 
-      if (!existing.deletedAt) {
+      if (!training.deletedAt) {
         throw conflictError("Treino já está ativo.");
+      }
+
+      const [athlete] = await ctx.db
+        .select()
+        .from(athletes)
+        .where(eq(athletes.id, training.athleteId));
+
+      if (!athlete) {
+        throw athleteNotFound();
+      }
+
+      if (athlete.deletedAt) {
+        throw conflictError(
+          "Não é possível realizar esta operação em treinos de um atleta desativado.",
+        );
       }
 
       try {

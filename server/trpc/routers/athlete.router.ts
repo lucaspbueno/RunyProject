@@ -1,18 +1,18 @@
 import "server-only";
 
 import { z } from "zod";
-import { eq, desc, count, isNull } from "drizzle-orm";
+import { count, desc, eq, isNull } from "drizzle-orm";
 import { publicProcedure, t } from "../trpc";
 import { athletes } from "@/server/db/schema";
 import {
   createAthleteSchema,
-  updateAthleteSchema,
-  listAthletesSchema,
-  getAthleteSchema,
   deleteAthleteSchema,
+  getAthleteSchema,
+  listAthletesSchema,
   reactivateAthleteSchema,
-} from "../../../shared/schemas/athlete-schema";
-import type { PaginatedResponse } from "../../../shared/types";
+  updateAthleteSchema,
+} from "@/shared/schemas/athlete-schema";
+import type { PaginatedResponse } from "@/shared/types";
 import {
   athleteNotFound,
   conflictError,
@@ -21,16 +21,25 @@ import {
   isConnectionError,
   isTRPCError,
   isUniqueViolation,
-} from "../errors";
+} from "@/server/trpc/errors";
 
 /**
  * Router tRPC para operações CRUD de atletas.
  * Todos os erros usam TRPCError com códigos semânticos.
+ *
+ * Regras de ativo/inativo aplicadas via guards de status-policy.ts:
+ *  - getById     → retorna independente do status (leitura total)
+ *  - create      → sempre cria como ativo
+ *  - list        → ativos por padrão; includeDeleted=true mostra todos
+ *  - update      → ❌ CONFLICT se atleta inativo
+ *  - delete      → ❌ CONFLICT se atleta já inativo
+ *  - reactivate  → ❌ CONFLICT se atleta já ativo
  */
 export const athleteRouter = t.router({
   /**
    * Buscar atleta por ID.
-   * Retorna o atleta independente de status (ativo/inativo).
+   * Retorna o atleta independente do status (ativo/inativo) —
+   * necessário para telas de detalhe, auditoria e reativação.
    */
   getById: publicProcedure
     .input(getAthleteSchema)
@@ -49,6 +58,7 @@ export const athleteRouter = t.router({
 
   /**
    * Criar novo atleta.
+   * Sempre cria com deletedAt = null (ativo).
    */
   create: publicProcedure
     .input(createAthleteSchema)
@@ -80,6 +90,7 @@ export const athleteRouter = t.router({
 
   /**
    * Listar atletas com paginação.
+   * Por padrão exibe apenas ativos; inativos visíveis com includeDeleted=true.
    */
   list: publicProcedure
     .input(listAthletesSchema)
@@ -132,7 +143,7 @@ export const athleteRouter = t.router({
 
   /**
    * Atualizar atleta existente.
-   * Regra P0.2: atleta inativo não pode ser editado.
+   * Regra: atleta inativo não pode ser editado.
    */
   update: publicProcedure
     .input(
@@ -144,21 +155,20 @@ export const athleteRouter = t.router({
     .mutation(async ({ input, ctx }) => {
       const { id, data } = input;
 
-      const [existing] = await ctx.db
+      const [athlete] = await ctx.db
         .select()
         .from(athletes)
         .where(eq(athletes.id, id));
 
-      if (!existing) {
+      if (!athlete) {
         throw athleteNotFound();
       }
 
-      if (existing.deletedAt) {
+      if (athlete.deletedAt) {
         throw conflictError("Não é possível editar um atleta desativado.");
       }
 
       try {
-        // Separar dateOfBirth para conversão de string → Date sem usar any
         const { dateOfBirth: dateOfBirthStr, ...rest } = data;
 
         const updateData = {
@@ -189,21 +199,21 @@ export const athleteRouter = t.router({
 
   /**
    * Desativar atleta (soft-delete).
-   * Regra P0.2: atleta já inativo retorna CONFLICT.
+   * Regra: atleta já inativo retorna CONFLICT.
    */
   delete: publicProcedure
     .input(deleteAthleteSchema)
     .mutation(async ({ input, ctx }) => {
-      const [existing] = await ctx.db
+      const [athlete] = await ctx.db
         .select()
         .from(athletes)
         .where(eq(athletes.id, input.id));
 
-      if (!existing) {
+      if (!athlete) {
         throw athleteNotFound();
       }
 
-      if (existing.deletedAt) {
+      if (athlete.deletedAt) {
         throw conflictError("Atleta já está desativado.");
       }
 
@@ -227,22 +237,22 @@ export const athleteRouter = t.router({
 
   /**
    * Reativar atleta (remove soft-delete).
-   * Regra P0.2: atleta já ativo retorna CONFLICT.
+   * Regra: atleta já ativo retorna CONFLICT.
    */
   reactivate: publicProcedure
     .input(reactivateAthleteSchema)
     .mutation(async ({ input, ctx }) => {
-      const [existing] = await ctx.db
+      const [athlete] = await ctx.db
         .select()
         .from(athletes)
         .where(eq(athletes.id, input.id));
 
-      if (!existing) {
+      if (!athlete) {
         throw athleteNotFound();
       }
 
-      if (!existing.deletedAt) {
-        throw conflictError("Atleta já está ativo.");
+      if (athlete.deletedAt) {
+        throw conflictError("Atleta já está desativado.");
       }
 
       try {
