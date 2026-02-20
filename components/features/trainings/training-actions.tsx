@@ -2,14 +2,7 @@ import { EditButton } from "@/components/ui/actions/edit-button";
 import { DeleteButton } from "@/components/ui/actions/delete-button";
 import { ReactivateButton } from "@/components/ui/actions/reactivate-button";
 import { ActionGroup } from "@/components/ui/actions/action-group";
-
-interface Training {
-  id: number;
-  type: string;
-  date: Date | string;
-  athleteId: number;
-  deletedAt?: Date | string | null;
-}
+import type { Training } from "@/shared/types";
 
 interface TrainingActionsProps {
   training: Training;

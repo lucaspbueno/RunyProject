@@ -4,15 +4,7 @@ import { Button } from "@/components/ui/button";
 import { calculateAge, formatDateBR } from "@/lib/date";
 import Link from "next/link";
 import { Calendar, Users, Clock } from "lucide-react";
-
-interface Athlete {
-  id: number;
-  name: string;
-  email: string;
-  dateOfBirth: Date | string;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-}
+import type { Athlete } from "@/shared/types";
 
 interface TrainingCardProps {
   athlete: Athlete;

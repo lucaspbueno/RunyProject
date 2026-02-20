@@ -1,13 +1,5 @@
 import { TrainingCard } from "./training-card";
-
-interface Athlete {
-  id: number;
-  name: string;
-  email: string;
-  dateOfBirth: Date | string;
-  createdAt: Date | string;
-  updatedAt: Date | string;
-}
+import type { Athlete } from "@/shared/types";
 
 interface TrainingsGridProps {
   athletes: Athlete[];
