@@ -1,5 +1,5 @@
 import type { AthleteInsightsResponse } from "@/shared/types/domain/athlete-insights";
-import type { AthleteInsightKpi, AthleteInsight } from "@/shared/types/domain/athlete";
+import type { AthleteInsightKpi, AthleteInsight } from "@/shared/types/domain/athlete-insights";
 import type { Training } from "@/server/db/schema/tables/training";
 import {
   calculateTrainingLoad,
