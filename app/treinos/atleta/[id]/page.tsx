@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { Navigation } from "@/components/navigation";
 import { Wrapper } from "@/components/wrapper";
@@ -94,16 +94,14 @@ export default function TreinosAtletaPage() {
   const permitir_desativado: boolean =
     searchParams.get("permitir_desativado") === "1";
 
-  const loadAthlete = async () => {
+  const loadAthlete = useCallback(async () => {
     try {
-      const result = await trpcClient.athletes.list.query({
-        page: 1,
-        limit: 50,
-        includeDeleted: permitir_desativado,
+      const foundAthlete = await trpcClient.athletes.getById.query({
+        id: athleteId,
       });
-      const foundAthlete = result.items.find((a) => a.id === athleteId);
 
-      if (!foundAthlete) {
+      // Atleta desativado só é permitido quando a URL traz o flag explícito
+      if (foundAthlete.deletedAt && !permitir_desativado) {
         toast({
           title: "Erro",
           description: "Atleta não encontrado",
@@ -118,34 +116,38 @@ export default function TreinosAtletaPage() {
       console.error("Erro ao carregar atleta:", error);
       toast({
         title: "Erro",
-        description: "Falha ao carregar os dados do atleta",
+        description: "Atleta não encontrado ou falha ao carregar os dados.",
         variant: "destructive",
       });
+      router.push("/treinos");
     }
-  };
+  }, [athleteId, permitir_desativado, router, toast]);
 
-  const loadTrainings = async (page: number = 1) => {
-    try {
-      setLoading(true);
-      const result = await trpcClient.trainings.listByAthlete.query({
-        athleteId,
-        page,
-        limit: 10,
-        includeDeleted: showInactive,
-      });
-      setTrainings(result);
-      setCurrentPage(page);
-    } catch (error) {
-      console.error("Erro ao carregar treinos:", error);
-      toast({
-        title: "Erro",
-        description: "Falha ao carregar a lista de treinos",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loadTrainings = useCallback(
+    async (page: number = 1) => {
+      try {
+        setLoading(true);
+        const result = await trpcClient.trainings.listByAthlete.query({
+          athleteId,
+          page,
+          limit: 10,
+          includeDeleted: showInactive,
+        });
+        setTrainings(result);
+        setCurrentPage(page);
+      } catch (error) {
+        console.error("Erro ao carregar treinos:", error);
+        toast({
+          title: "Erro",
+          description: "Falha ao carregar a lista de treinos",
+          variant: "destructive",
+        });
+      } finally {
+        setLoading(false);
+      }
+    },
+    [athleteId, showInactive, toast],
+  );
 
   const handleDelete = async (id: number) => {
     try {
@@ -206,12 +208,15 @@ export default function TreinosAtletaPage() {
     }
   };
 
+  // Carrega o atleta uma vez (ou quando athleteId / permitir_desativado mudar)
   useEffect(() => {
-    if (athleteId) {
-      loadAthlete();
-      loadTrainings();
-    }
-  }, [athleteId, showInactive]);
+    loadAthlete();
+  }, [loadAthlete]);
+
+  // Recarrega treinos quando athleteId ou showInactive mudar
+  useEffect(() => {
+    loadTrainings();
+  }, [loadTrainings]);
 
   if (!athlete) {
     return (
